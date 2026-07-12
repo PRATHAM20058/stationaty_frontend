@@ -1,0 +1,52 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>{{ mode === 'full' ? 'Mark as Paid' : 'Record Payment' }}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="cancel()">Cancel</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-text color="medium">
+    <p>Amount due: ₹{{ amountDue | number: '1.0-2' }}</p>
+  </ion-text>
+
+  @if (mode === 'partial') {
+    <ion-item fill="outline" class="ion-margin-bottom">
+      <ion-label position="stacked">Amount received</ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        placeholder="0"
+        [(ngModel)]="amountReceived"
+        [max]="amountDue"
+        appEnterNext
+      ></ion-input>
+    </ion-item>
+  } @else {
+    <p>Confirm the full amount of ₹{{ amountDue | number: '1.0-2' }} was received.</p>
+  }
+
+  <ion-label>Payment Method</ion-label>
+  <ion-segment [(ngModel)]="paymentMethod" class="ion-margin-top">
+    <ion-segment-button value="cash">
+      <ion-label>Cash</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="upi">
+      <ion-label>UPI</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="cheque">
+      <ion-label>Cheque</ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  @if (paymentMethod === 'cheque') {
+    <ion-item fill="outline" class="ion-margin-top">
+      <ion-label position="stacked">Cheque No. (optional)</ion-label>
+      <ion-input [(ngModel)]="chequeNo" placeholder="e.g. 000123" appEnterNext></ion-input>
+    </ion-item>
+  }
+
+  <ion-button expand="block" class="ion-margin-top" [disabled]="!isValid" (click)="save()">Save</ion-button>
+</ion-content>

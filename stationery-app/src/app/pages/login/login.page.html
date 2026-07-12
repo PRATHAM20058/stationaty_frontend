@@ -1,0 +1,48 @@
+<ion-content class="ion-padding login-content">
+  <div class="login-wrap">
+    <div class="brand">
+      <ion-icon name="storefront-outline"></ion-icon>
+      <h1>Stationery Shop</h1>
+      <p>Sign in to manage your store</p>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <ion-item fill="outline" class="ion-margin-bottom">
+        <ion-icon slot="start" name="person-outline" aria-hidden="true"></ion-icon>
+        <ion-label position="stacked">Username</ion-label>
+        <ion-input formControlName="username" type="text" autocomplete="username" placeholder="Enter username" appEnterNext></ion-input>
+      </ion-item>
+
+      <ion-item fill="outline" class="ion-margin-bottom">
+        <ion-icon slot="start" name="lock-closed-outline" aria-hidden="true"></ion-icon>
+        <ion-label position="stacked">Password</ion-label>
+        <ion-input formControlName="password" type="password" autocomplete="current-password" placeholder="Enter password" appEnterNext></ion-input>
+      </ion-item>
+
+      @if (errorMessage) {
+        <ion-text color="danger">
+          <p class="error-text">{{ errorMessage }}</p>
+        </ion-text>
+      }
+
+      <ion-button expand="block" type="submit" size="large" [disabled]="loading">
+        @if (loading) {
+          <ion-spinner name="crescent"></ion-spinner>
+        } @else {
+          Login
+        }
+      </ion-button>
+    </form>
+
+    <ion-button expand="block" fill="clear" routerLink="/signup" [disabled]="loading">
+      Don't have an account? Sign up
+    </ion-button>
+
+    <div class="demo-hint">
+      <p>No backend yet? Use the demo account — it logs in locally and loads sample categories, items and bills.</p>
+      <ion-button expand="block" fill="outline" [disabled]="loading" (click)="fillDemoCredentials()">
+        Continue with demo account (admin / admin123)
+      </ion-button>
+    </div>
+  </div>
+</ion-content>

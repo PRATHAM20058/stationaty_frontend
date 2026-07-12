@@ -1,0 +1,7 @@
+{
+  "name": "stationery-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}

@@ -1,0 +1,28 @@
+.category-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ion-color-medium);
+}
+
+.location-card {
+  margin: 16px 0;
+
+  ion-card-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .label {
+    margin: 0;
+    font-size: 0.8rem;
+    opacity: 0.8;
+  }
+
+  h2 {
+    margin: 2px 0 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+}

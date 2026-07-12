@@ -1,0 +1,49 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/billing"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Pending Bills</ion-title>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-searchbar placeholder="Filter by customer name" [(ngModel)]="customerFilter" (ionInput)="applyFilter()"></ion-searchbar>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <div class="summary-bar">
+    Total pending: <strong>₹{{ totalDue | number: '1.0-2' }}</strong> across {{ bills.length }} bill(s)
+  </div>
+
+  @if (loading) {
+    <ion-list>
+      @for (i of [1, 2, 3]; track i) {
+        <ion-item>
+          <ion-label><ion-skeleton-text animated style="width: 70%"></ion-skeleton-text></ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  } @else if (filtered.length === 0) {
+    <div class="empty-state">
+      <div class="empty-state-icon all-clear"><ion-icon name="checkmark-done-outline"></ion-icon></div>
+      <h3>All settled up</h3>
+      <p>{{ customerFilter ? 'No pending bills match that customer.' : 'No pending or partial payments. Every bill is fully paid.' }}</p>
+    </div>
+  } @else {
+    <ion-list>
+      @for (bill of filtered; track bill.id) {
+        <ion-item button (click)="goToDetail(bill)">
+          <ion-label>
+            <h2>{{ bill.customerName }}</h2>
+            <p>{{ bill.customerPhone || 'No phone' }} · {{ bill.billNo }}</p>
+            <p>{{ bill.date | date: 'mediumDate' }} · {{ daysSince(bill.date) }} day(s) ago</p>
+          </ion-label>
+          <div slot="end" class="amount-col">
+            <p class="grand-total">₹{{ bill.grandTotal | number: '1.0-2' }}</p>
+            <ion-badge color="warning">DUE ₹{{ bill.amountDue | number: '1.0-2' }}</ion-badge>
+          </div>
+        </ion-item>
+      }
+    </ion-list>
+  }
+</ion-content>

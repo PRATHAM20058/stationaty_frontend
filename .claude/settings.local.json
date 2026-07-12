@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(ionic *)",
+      "Bash(npm install *)",
+      "Bash(java *)",
+      "Bash(export ANDROID_HOME=\"$HOME/Library/Android/sdk\")",
+      "Bash(/Users/parmarpratham/Library/Android/sdk/emulator/emulator -list-avds)",
+      "Bash(/Users/parmarpratham/Library/Android/sdk/platform-tools/adb version *)",
+      "Read(//Users/parmarpratham/Library/Android/sdk/**)",
+      "Bash(/Users/parmarpratham/Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager --list_installed)",
+      "Bash(npx ng *)",
+      "Bash(npx cap *)",
+      "Bash(ANDROID_HOME=/Users/parmarpratham/Library/Android/sdk ./gradlew assembleDebug)"
+    ]
+  }
+}

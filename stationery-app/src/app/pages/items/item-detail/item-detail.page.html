@@ -1,0 +1,65 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/items"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Item Detail</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="edit()">
+        <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @if (loading) {
+    <ion-skeleton-text animated style="width: 80%; height: 32px"></ion-skeleton-text>
+  } @else if (!item) {
+    <p>Item not found.</p>
+  } @else {
+    <h1>{{ item.name }}</h1>
+    <p class="category-line">
+      <ion-icon name="pricetag-outline"></ion-icon>
+      {{ item.category }}
+    </p>
+
+    <ion-card color="tertiary" class="location-card">
+      <ion-card-content>
+        <ion-icon name="location-outline" size="large"></ion-icon>
+        <div>
+          <p class="label">Godown Location</p>
+          <h2>{{ item.godownLocation || 'Not set' }}</h2>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-list inset>
+      <ion-item>
+        <ion-label>Stock Quantity</ion-label>
+        <ion-badge slot="end" [color]="item.stockQty <= lowStockThreshold ? 'danger' : 'success'">
+          {{ item.stockQty }} {{ item.unit }}
+        </ion-badge>
+      </ion-item>
+      <ion-item>
+        <ion-label>Selling Price</ion-label>
+        <ion-label slot="end">₹{{ item.sellingPrice }}</ion-label>
+      </ion-item>
+      <ion-item>
+        <ion-label>Purchase Price</ion-label>
+        <ion-label slot="end">₹{{ item.purchasePrice }}</ion-label>
+      </ion-item>
+      @if (item.sku) {
+        <ion-item>
+          <ion-label>SKU</ion-label>
+          <ion-label slot="end">{{ item.sku }}</ion-label>
+        </ion-item>
+      }
+      @if (item.pendingSync) {
+        <ion-item>
+          <ion-label color="warning">Pending sync</ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  }
+</ion-content>

@@ -1,0 +1,91 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Bills</ion-title>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-searchbar
+      placeholder="Search by customer name or mobile number"
+      [debounce]="250"
+      [(ngModel)]="searchTerm"
+      (ionInput)="onSearch($any($event.target).value)"
+    ></ion-searchbar>
+  </ion-toolbar>
+  <ion-toolbar>
+    <div class="filter-row">
+      <div class="chip-row">
+        @for (opt of statusOptions; track opt.value) {
+          <ion-chip [color]="statusFilter === opt.value ? 'primary' : 'medium'" (click)="selectStatus(opt.value)">
+            <ion-label>{{ opt.label }}</ion-label>
+          </ion-chip>
+        }
+      </div>
+      <div class="date-filter">
+        <ion-button id="from-date-trigger" fill="outline" size="small" class="date-filter-btn">
+          <ion-icon slot="start" name="calendar-outline"></ion-icon>
+          {{ fromDateInput ? (fromDateInput | date: 'dd MMM yyyy') : 'Date' }}
+        </ion-button>
+        @if (fromDateInput) {
+          <ion-button fill="clear" size="small" color="medium" (click)="clearFromDate()" aria-label="Clear date filter">
+            <ion-icon slot="icon-only" name="close-circle"></ion-icon>
+          </ion-button>
+        }
+      </div>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-modal trigger="from-date-trigger" #dateModal [keepContentsMounted]="true" class="date-filter-modal">
+  <ng-template>
+    <ion-datetime
+      presentation="date"
+      [preferWheel]="false"
+      [value]="fromDateInput || null"
+      (ionChange)="onDatePicked($any($event.target).value)"
+    >
+      <span slot="title">Show bills on this date</span>
+    </ion-datetime>
+  </ng-template>
+</ion-modal>
+
+<ion-content>
+  @if (loading) {
+    <ion-list>
+      @for (i of [1, 2, 3]; track i) {
+        <ion-item>
+          <ion-label><ion-skeleton-text animated style="width: 70%"></ion-skeleton-text></ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  } @else if (bills.length === 0) {
+    <div class="empty-state">
+      <div class="empty-state-icon"><ion-icon name="receipt-outline"></ion-icon></div>
+      <h3>{{ searchTerm ? 'No matching bills' : 'No bills yet' }}</h3>
+      <p>{{ searchTerm ? 'No bills found for that customer name or mobile number. Try another search or clear the filter.' : 'Bills you create will appear here, filterable by date and payment status.' }}</p>
+    </div>
+  } @else {
+    <ion-list>
+      @for (bill of bills; track bill.id) {
+        <ion-item button (click)="goToDetail(bill)">
+          <ion-label>
+            <h2>{{ bill.billNo }} · {{ bill.customerName }}</h2>
+            <p>{{ bill.customerPhone || 'No phone' }} · {{ bill.date | date: 'medium' }}</p>
+            @if (bill.pendingSync) {
+              <p class="pending-tag">Pending sync</p>
+            }
+          </ion-label>
+          <div slot="end" class="amount-col">
+            <p class="grand-total">₹{{ bill.grandTotal | number: '1.0-2' }}</p>
+            @if (bill.paymentStatus === 'paid') {
+              <ion-badge color="success">PAID</ion-badge>
+            } @else {
+              <ion-badge color="warning">DUE ₹{{ bill.amountDue | number: '1.0-2' }}</ion-badge>
+            }
+          </div>
+        </ion-item>
+      }
+    </ion-list>
+  }
+</ion-content>

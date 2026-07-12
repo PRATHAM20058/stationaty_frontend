@@ -1,0 +1,114 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Reports</ion-title>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-segment [value]="range" (ionChange)="setRange($any($event.detail.value))">
+      <ion-segment-button value="week">
+        <ion-label>Last 7 Days</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="month">
+        <ion-label>Last 30 Days</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h3 class="section-title">Sales <span class="unit">₹ collected per day</span></h3>
+  <div class="chart-card">
+    <div class="chart-summary">
+      <span>Total <strong>₹{{ totalInRange | number: '1.0-0' }}</strong></span>
+      <span>Avg/day <strong>₹{{ avgPerDay | number: '1.0-0' }}</strong></span>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="y-axis">
+        @for (t of ticks; track t.value) {
+          <span class="y-tick" [style.bottom.px]="20 + t.frac * 120">₹{{ fmtTick(t.value) }}</span>
+        }
+      </div>
+      <div class="plot" #plotEl>
+        <div class="plot-inner">
+          @for (t of ticks; track t.value) {
+            <div class="gridline" [style.bottom.px]="20 + t.frac * 120"></div>
+          }
+          <div class="bars">
+            @for (bucket of buckets; track bucket.label; let i = $index) {
+              <div class="bar-col" (click)="selectBar(i)">
+                <div
+                  class="bar"
+                  [class.zero]="bucket.total <= 0"
+                  [class.active]="i === selectedIndex"
+                  [style.height.px]="barHeight(bucket.total)"
+                  [title]="'₹' + bucket.total"
+                >
+                  @if (bucket.total > 0 && (i === selectedIndex || (selectedIndex === null && i === peakIndex))) {
+                    <span class="bar-value">₹{{ bucket.total | number: '1.0-0' }}</span>
+                  }
+                </div>
+                <span class="bar-label">{{ bucket.label }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title">Top Selling Items</h3>
+  @if (topItems.length === 0) {
+    <p class="empty-hint">No sales in this period yet.</p>
+  } @else {
+    <ion-list>
+      @for (top of topItems; track top.itemName; let i = $index) {
+        <ion-item>
+          <div slot="start" class="rank-chip" [class.gold]="i === 0">{{ i + 1 }}</div>
+          <ion-label>
+            <h2>{{ top.itemName }}</h2>
+            <p>{{ top.qtySold }} sold</p>
+          </ion-label>
+          <ion-label slot="end" class="revenue">₹{{ top.revenue | number: '1.0-0' }}</ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  }
+
+  <h3 class="section-title">Low Selling Items</h3>
+  @if (lowItems.length === 0) {
+    <p class="empty-hint">No sales in this period yet.</p>
+  } @else {
+    <ion-list>
+      @for (low of lowItems; track low.itemName; let i = $index) {
+        <ion-item>
+          <div slot="start" class="rank-chip">{{ i + 1 }}</div>
+          <ion-label>
+            <h2>{{ low.itemName }}</h2>
+            <p>{{ low.qtySold }} sold</p>
+          </ion-label>
+          <ion-label slot="end" class="revenue">₹{{ low.revenue | number: '1.0-0' }}</ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  }
+
+  <h3 class="section-title">Low Stock Items</h3>
+  @if (lowStockItems.length === 0) {
+    <p class="empty-hint">No low-stock items. All good!</p>
+  } @else {
+    <ion-list>
+      @for (item of lowStockItems; track item.id) {
+        <ion-item>
+          <ion-label>
+            <h2>{{ item.name }}</h2>
+            <p>{{ item.godownLocation || 'No location set' }}</p>
+          </ion-label>
+          <ion-badge slot="end" color="danger">{{ item.stockQty }} {{ item.unit }}</ion-badge>
+        </ion-item>
+      }
+    </ion-list>
+  }
+</ion-content>

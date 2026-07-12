@@ -1,0 +1,31 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Settings</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-list inset>
+    <ion-item>
+      <ion-label>Signed in as</ion-label>
+      <ion-note slot="end">{{ (currentUser$ | async)?.name || '—' }}</ion-note>
+    </ion-item>
+    <ion-item>
+      <ion-label>Server URL</ion-label>
+      <ion-note slot="end">{{ apiUrl }}</ion-note>
+    </ion-item>
+    <ion-item>
+      <ion-label>Appearance</ion-label>
+      <ion-note slot="end">Follows system light/dark mode</ion-note>
+    </ion-item>
+  </ion-list>
+
+  <ion-list inset>
+    <ion-item button (click)="logout()">
+      <ion-label color="danger">Logout</ion-label>
+    </ion-item>
+  </ion-list>
+</ion-content>

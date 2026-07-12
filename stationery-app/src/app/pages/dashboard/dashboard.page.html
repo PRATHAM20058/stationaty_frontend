@@ -1,0 +1,107 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Dashboard</ion-title>
+    <ion-buttons slot="end">
+      <app-sync-status></app-sync-status>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-refresher slot="fixed" (ionRefresh)="load($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-grid>
+    <ion-row>
+      <ion-col size="6">
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>
+              <ion-icon name="cash-outline" color="success"></ion-icon>
+              Today's Sales
+            </ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            @if (loading) {
+              <ion-skeleton-text animated style="width: 60%; height: 28px"></ion-skeleton-text>
+            } @else {
+              <h2>₹{{ totalSales | number: '1.0-2' }}</h2>
+            }
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+      <ion-col size="6">
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>
+              <ion-icon name="receipt-outline" color="primary"></ion-icon>
+              Bills Today
+            </ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            @if (loading) {
+              <ion-skeleton-text animated style="width: 40%; height: 28px"></ion-skeleton-text>
+            } @else {
+              <h2>{{ billCount }}</h2>
+            }
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <ion-row>
+      <ion-col size="12">
+        <ion-card button (click)="goToPendingBills()" color="warning" class="pending-card">
+          <ion-card-content class="pending-content">
+            <div>
+              <ion-card-title>Pending Payments</ion-card-title>
+              @if (loading) {
+                <ion-skeleton-text animated style="width: 50%; height: 20px"></ion-skeleton-text>
+              } @else {
+                <p>₹{{ pendingTotalDue | number: '1.0-2' }} due across {{ pendingCount }} bill(s)</p>
+              }
+            </div>
+            <ion-icon name="alert-circle-outline" size="large"></ion-icon>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <ion-row>
+      <ion-col size="6">
+        <ion-button expand="block" size="large" (click)="goToBilling()">
+          <ion-icon slot="start" name="cart-outline"></ion-icon>
+          New Bill
+        </ion-button>
+      </ion-col>
+      <ion-col size="6">
+        <ion-button expand="block" size="large" fill="outline" (click)="goToAddItem()">
+          <ion-icon slot="start" name="add-circle-outline"></ion-icon>
+          Add Item
+        </ion-button>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
+
+  @if (lowStockItems.length > 0) {
+    <h3 class="section-title">
+      <ion-icon name="cube-outline"></ion-icon>
+      Low Stock Alerts
+    </h3>
+    <ion-list>
+      @for (item of lowStockItems; track item.id) {
+        <ion-item>
+          <ion-label>
+            <h2>{{ item.name }}</h2>
+            <p>{{ item.godownLocation || 'No location set' }}</p>
+          </ion-label>
+          <ion-badge color="danger" slot="end">{{ item.stockQty }} {{ item.unit }}</ion-badge>
+        </ion-item>
+      }
+    </ion-list>
+  }
+</ion-content>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Stationery Shop</string>
+    <string name="title_activity_main">Stationery Shop</string>
+    <string name="package_name">com.mystore.stationery</string>
+    <string name="custom_url_scheme">com.mystore.stationery</string>
+</resources>

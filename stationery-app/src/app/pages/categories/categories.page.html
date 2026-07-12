@@ -1,0 +1,59 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Categories</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="openForm()">
+        <ion-icon slot="icon-only" name="add-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  @if (loading) {
+    <ion-list>
+      @for (i of [1, 2, 3, 4]; track i) {
+        <ion-item>
+          <ion-label><ion-skeleton-text animated style="width: 60%"></ion-skeleton-text></ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  } @else if (categories.length === 0) {
+    <div class="empty-state">
+      <div class="empty-state-icon"><ion-icon name="pricetags-outline"></ion-icon></div>
+      <h3>No categories yet</h3>
+      <p>Group your stock into categories so items are easy to find and filter.</p>
+      <ion-button (click)="openForm()">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        Add Category
+      </ion-button>
+    </div>
+  } @else {
+    <ion-list>
+      @for (category of categories; track category.id) {
+        <ion-item-sliding #slidingItem>
+          <ion-item button (click)="openForm(category)">
+            <ion-label>
+              <h2>{{ category.name }}</h2>
+              @if (category.pendingSync) {
+                <p class="pending-tag">Pending sync</p>
+              }
+            </ion-label>
+            <ion-badge slot="end" color="medium">{{ category.itemCount }} items</ion-badge>
+          </ion-item>
+          <ion-item-options side="end">
+            <ion-item-option color="primary" (click)="openForm(category)">
+              <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+            </ion-item-option>
+            <ion-item-option color="danger" (click)="confirmDelete(category, slidingItem)">
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-item-option>
+          </ion-item-options>
+        </ion-item-sliding>
+      }
+    </ion-list>
+  }
+</ion-content>

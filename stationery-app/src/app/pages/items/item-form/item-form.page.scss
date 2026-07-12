@@ -1,0 +1,32 @@
+.sku-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+
+  .sku-field {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* White "scan" button — stretches to the SKU field's height so their top and
+     bottom edges line up, with a subtle border + shadow and a large icon so it
+     reads as a clean, professional control rather than a big blue block. */
+  .scan-button {
+    flex: 0 0 56px;
+    width: 56px;
+    height: auto;
+    margin: 0;
+    --padding-top: 0;
+    --padding-bottom: 0;
+    --background: var(--app-surface);
+    --background-activated: var(--app-surface-variant);
+    --background-hover: var(--app-surface-variant);
+    --color: var(--ion-color-primary);
+    --border-radius: var(--app-radius-md);
+    --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), inset 0 0 0 1px var(--app-border);
+
+    ion-icon {
+      font-size: 34px;
+    }
+  }
+}

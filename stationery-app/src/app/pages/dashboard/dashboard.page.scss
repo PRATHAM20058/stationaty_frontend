@@ -1,0 +1,77 @@
+ion-grid { padding: 4px 0; }
+
+// Stat cards — compact, elegant, with an accent icon chip
+ion-card {
+  margin: 8px;
+
+  ion-card-header {
+    padding: 16px 16px 2px;
+  }
+
+  ion-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--ion-color-step-500);
+    text-transform: uppercase;
+
+    ion-icon {
+      font-size: 1.1rem;
+      padding: 7px;
+      border-radius: 11px;
+      background: var(--app-surface-variant);
+    }
+  }
+}
+
+ion-card-content h2 {
+  margin: 0;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ion-text-color);
+}
+
+// Pending payments — bold call-to-action card
+.pending-card {
+  margin: 8px;
+  border: none;
+  color: var(--ion-color-warning-contrast);
+  background: linear-gradient(135deg, var(--ion-color-warning-tint), var(--ion-color-warning-shade));
+  box-shadow: 0 10px 26px rgba(var(--ion-color-warning-rgb), 0.35);
+
+  ion-card-title { color: inherit; font-size: 1.05rem; }
+}
+
+.pending-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  p {
+    margin: 6px 0 0;
+    font-weight: 600;
+    opacity: 0.95;
+  }
+
+  ion-icon { font-size: 2.2rem; opacity: 0.9; }
+}
+
+// Quick-action buttons row
+ion-row ion-button { margin: 4px; }
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 4px 8px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+
+  ion-icon { color: var(--ion-color-primary); }
+}

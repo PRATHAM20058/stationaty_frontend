@@ -1,0 +1,63 @@
+.company-head {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--app-border, var(--ion-color-step-150));
+
+  h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    margin: 3px 0 0;
+    font-size: 0.85rem;
+    color: var(--ion-color-medium);
+  }
+}
+
+.bill-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+
+  h1 {
+    margin: 0;
+    font-size: 1.4rem;
+  }
+
+  p {
+    margin: 2px 0 0;
+    color: var(--ion-color-medium);
+  }
+}
+
+.section-title {
+  margin: 16px 0 8px;
+}
+
+.line-discount {
+  color: var(--ion-color-warning-shade, var(--ion-color-warning));
+  font-weight: 600;
+}
+
+.edit-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .qty-value {
+    min-width: 24px;
+    text-align: center;
+    font-weight: 700;
+  }
+}
+
+.edit-warning {
+  color: var(--ion-color-danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 4px 16px 12px;
+}

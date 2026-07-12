@@ -1,0 +1,33 @@
+.summary-bar {
+  margin: 12px;
+  padding: 14px 18px;
+  border-radius: var(--app-radius-lg);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--ion-color-warning-rgb), 0.18),
+    rgba(var(--ion-color-warning-rgb), 0.08)
+  );
+  border: 1px solid rgba(var(--ion-color-warning-rgb), 0.28);
+  color: var(--ion-text-color);
+  font-size: 0.92rem;
+
+  strong { font-weight: 800; }
+}
+
+.empty-state-icon.all-clear {
+  background: linear-gradient(
+    145deg,
+    rgba(var(--ion-color-success-rgb), 0.16),
+    rgba(var(--ion-color-success-rgb), 0.06)
+  );
+  color: var(--ion-color-success);
+}
+
+.amount-col {
+  text-align: right;
+
+  .grand-total {
+    margin: 0 0 4px;
+    font-weight: 700;
+  }
+}

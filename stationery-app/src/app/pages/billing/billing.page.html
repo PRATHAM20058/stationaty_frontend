@@ -1,0 +1,235 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>New Bill</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="goToPendingBills()">
+        <ion-icon slot="start" name="time-outline"></ion-icon>
+        Pending
+        @if (pendingCount > 0) {
+          <ion-badge color="danger">{{ pendingCount }}</ion-badge>
+        }
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-searchbar
+      placeholder="Search item to add"
+      [debounce]="250"
+      [(ngModel)]="searchTerm"
+      (ionInput)="onSearch($any($event.target).value)"
+    ></ion-searchbar>
+    <ion-buttons slot="end">
+      <ion-button (click)="scanBarcode()" aria-label="Scan QR or barcode">
+        <ion-icon slot="icon-only" name="qr-code-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+  @if (categories.length > 0) {
+    <ion-toolbar>
+      <div class="category-row">
+        @for (cat of categories; track cat.id) {
+          <ion-chip
+            [color]="selectedCategoryId === cat.id ? 'primary' : 'medium'"
+            [outline]="selectedCategoryId !== cat.id"
+            (click)="selectCategory(cat)"
+          >
+            <ion-label>{{ cat.name }}</ion-label>
+          </ion-chip>
+        }
+      </div>
+    </ion-toolbar>
+  }
+</ion-header>
+
+<ion-content class="ion-padding">
+  @if (searchResults.length > 0) {
+    <ion-list class="search-results">
+      @for (item of searchResults; track item.id) {
+        <ion-item button (click)="addToCart(item)">
+          <ion-label>
+            <h2>{{ item.name }}</h2>
+            <p>₹{{ item.sellingPrice }} · {{ item.stockQty }} {{ item.unit }} in stock</p>
+          </ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  } @else if (selectedCategoryId) {
+    <ion-list class="search-results">
+      <div class="results-heading">
+        <ion-icon name="pricetag-outline"></ion-icon>
+        {{ selectedCategoryName }} · {{ categoryItems.length }} item(s)
+      </div>
+      @if (categoryItems.length === 0) {
+        <ion-item lines="none">
+          <ion-label color="medium">No items in this category yet.</ion-label>
+        </ion-item>
+      } @else {
+        @for (item of categoryItems; track item.id) {
+          <ion-item button (click)="addToCart(item)">
+            <ion-label>
+              <h2>{{ item.name }}</h2>
+              <p>₹{{ item.sellingPrice }} · {{ item.stockQty }} {{ item.unit }} in stock</p>
+            </ion-label>
+            <ion-icon slot="end" name="add-outline" color="primary"></ion-icon>
+          </ion-item>
+        }
+      }
+    </ion-list>
+  }
+
+  <h3 class="section-title">
+    <ion-icon name="cart-outline"></ion-icon>
+    Cart
+  </h3>
+  @if (cart.length === 0) {
+    <div class="cart-empty">
+      <div class="cart-empty-icon"><ion-icon name="cart-outline"></ion-icon></div>
+      <p>Search or pick a category above, then tap an item to add it to the cart.</p>
+    </div>
+  } @else {
+    <ion-list>
+      @for (line of cart; track line.itemId) {
+        <ion-item class="cart-row">
+          <ion-label>
+            <h2>{{ line.itemName }}</h2>
+            <p>₹{{ line.price }} × {{ line.qty }} = ₹{{ line.subtotal | number: '1.0-2' }}</p>
+            @if (line.discount > 0) {
+              <p class="line-discount">-₹{{ line.discount | number: '1.0-2' }} discount → ₹{{ lineNetTotal(line) | number: '1.0-2' }}</p>
+            }
+          </ion-label>
+          <div class="qty-stepper" slot="end">
+            <ion-button size="small" fill="outline" (click)="decQty(line)">
+              <ion-icon slot="icon-only" name="remove-outline"></ion-icon>
+            </ion-button>
+            <ion-input
+              class="qty-value"
+              type="number"
+              inputmode="numeric"
+              fill="outline"
+              [ngModel]="line.qty"
+              (ionChange)="onQtyInput(line, $any($event.target).value)"
+            ></ion-input>
+            <ion-button size="small" fill="outline" (click)="incQty(line)">
+              <ion-icon slot="icon-only" name="add-outline"></ion-icon>
+            </ion-button>
+            <ion-button
+              size="small"
+              fill="clear"
+              [color]="line.discountOpen || line.discount > 0 ? 'warning' : 'medium'"
+              (click)="toggleDiscount(line)"
+              aria-label="Item discount"
+            >
+              <ion-icon slot="icon-only" name="pricetag-outline"></ion-icon>
+            </ion-button>
+            <ion-button size="small" color="danger" fill="clear" (click)="removeLine(line)">
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-button>
+          </div>
+        </ion-item>
+        @if (line.discountOpen) {
+          <ion-item class="discount-editor" lines="none">
+            <div class="discount-editor-row">
+              <ion-segment [(ngModel)]="line.discountMode" (ionChange)="recalcLine(line)">
+                <ion-segment-button value="amount">
+                  <ion-label>₹</ion-label>
+                </ion-segment-button>
+                <ion-segment-button value="percent">
+                  <ion-label>%</ion-label>
+                </ion-segment-button>
+              </ion-segment>
+              <ion-input
+                class="discount-editor-input"
+                type="number"
+                inputmode="decimal"
+                placeholder="0"
+                [(ngModel)]="line.discountInput"
+                (ionInput)="recalcLine(line)"
+              ></ion-input>
+            </div>
+          </ion-item>
+        }
+      }
+    </ion-list>
+  }
+
+  <h3 class="section-title">Customer</h3>
+  <ion-item fill="outline" class="ion-margin-bottom">
+    <ion-label position="stacked">Customer Name {{ paymentStatus !== 'paid' ? '(required)' : '(optional)' }}</ion-label>
+    <ion-input [(ngModel)]="customerName" placeholder="Walk-in Customer" appEnterNext></ion-input>
+  </ion-item>
+  <ion-item fill="outline" class="ion-margin-bottom">
+    <ion-label position="stacked">Phone (optional)</ion-label>
+    <ion-input [(ngModel)]="customerPhone" type="tel" appEnterNext></ion-input>
+  </ion-item>
+
+  <div class="totals">
+    <div class="totals-row"><span>Total</span><span>₹{{ total | number: '1.0-2' }}</span></div>
+    @if (totalDiscount > 0) {
+      <div class="totals-row"><span>Item discounts</span><span>-₹{{ totalDiscount | number: '1.0-2' }}</span></div>
+    }
+    <div class="totals-row grand"><span>Grand Total</span><span>₹{{ grandTotal | number: '1.0-2' }}</span></div>
+  </div>
+
+  <h3 class="section-title">Payment</h3>
+  <ion-segment [(ngModel)]="paymentStatus">
+    <ion-segment-button value="paid">
+      <ion-label>Paid</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="pending">
+      <ion-label>Pending</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="partial">
+      <ion-label>Partial</ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  @if (paymentStatus === 'paid') {
+    <ion-segment [(ngModel)]="paymentMethod" class="ion-margin-top">
+      <ion-segment-button value="cash">
+        <ion-label>Cash</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="upi">
+        <ion-label>UPI</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="cheque">
+        <ion-label>Cheque</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+    @if (paymentMethod === 'cheque') {
+      <ion-item fill="outline" class="ion-margin-top">
+        <ion-label position="stacked">Cheque No. (optional)</ion-label>
+        <ion-input [(ngModel)]="chequeNo" placeholder="e.g. 000123" appEnterNext></ion-input>
+      </ion-item>
+    }
+  }
+
+  @if (paymentStatus === 'partial') {
+    <ion-item fill="outline" class="ion-margin-top ion-margin-bottom">
+      <ion-label position="stacked">Amount received now (₹)</ion-label>
+      <ion-input [(ngModel)]="partialAmountReceived" type="number" inputmode="decimal" placeholder="0" appEnterNext></ion-input>
+    </ion-item>
+    <ion-segment [(ngModel)]="paymentMethod">
+      <ion-segment-button value="cash"><ion-label>Cash</ion-label></ion-segment-button>
+      <ion-segment-button value="upi"><ion-label>UPI</ion-label></ion-segment-button>
+      <ion-segment-button value="cheque"><ion-label>Cheque</ion-label></ion-segment-button>
+    </ion-segment>
+    @if (paymentMethod === 'cheque') {
+      <ion-item fill="outline" class="ion-margin-top">
+        <ion-label position="stacked">Cheque No. (optional)</ion-label>
+        <ion-input [(ngModel)]="chequeNo" placeholder="e.g. 000123" appEnterNext></ion-input>
+      </ion-item>
+    }
+    <p class="due-line">Amount due: ₹{{ amountDue | number: '1.0-2' }}</p>
+  }
+
+  @if (paymentStatus === 'pending') {
+    <p class="due-line">Full amount ₹{{ grandTotal | number: '1.0-2' }} will be marked as due.</p>
+  }
+
+  <ion-button expand="block" size="large" class="ion-margin-top generate-btn" [disabled]="!canGenerate || saving" (click)="generateBill()">
+    Generate Bill
+  </ion-button>
+</ion-content>

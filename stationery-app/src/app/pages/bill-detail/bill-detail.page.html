@@ -1,0 +1,189 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Bill Detail</ion-title>
+    <ion-buttons slot="end">
+      @if (bill && !editing) {
+        <ion-button (click)="startEdit()" aria-label="Edit bill items">
+          <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+        </ion-button>
+      }
+      <ion-button (click)="sharePdf()" [disabled]="sharing || editing">
+        <ion-icon slot="icon-only" name="share-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @if (loading) {
+    <ion-skeleton-text animated style="width: 80%; height: 32px"></ion-skeleton-text>
+  } @else if (!bill) {
+    <p>Bill not found.</p>
+  } @else {
+    <div class="company-head">
+      <h2>{{ company.name }}</h2>
+      <p>GSTIN: {{ company.gstNo }}</p>
+    </div>
+
+    <div class="bill-head">
+      <div>
+        <h1>{{ bill.billNo }}</h1>
+        <p>{{ bill.date | date: 'medium' }}</p>
+      </div>
+      @if (bill.paymentStatus === 'paid') {
+        <ion-badge color="success">PAID</ion-badge>
+      } @else {
+        <ion-badge color="warning">DUE ₹{{ bill.amountDue | number: '1.0-2' }}</ion-badge>
+      }
+    </div>
+
+    <ion-list inset>
+      <ion-item>
+        <ion-label>Customer</ion-label>
+        <ion-label slot="end">{{ bill.customerName }}</ion-label>
+      </ion-item>
+      @if (bill.customerPhone) {
+        <ion-item>
+          <ion-label>Phone</ion-label>
+          <ion-label slot="end">{{ bill.customerPhone }}</ion-label>
+        </ion-item>
+      }
+    </ion-list>
+
+    <h3 class="section-title">Items</h3>
+
+    @if (!editing) {
+      <ion-list inset>
+        @for (line of bill.items; track line.itemId) {
+          <ion-item>
+            <ion-label>
+              <h2>{{ line.itemName }}</h2>
+              <p>{{ line.qty }} × ₹{{ line.price }}</p>
+              @if (line.discount > 0) {
+                <p class="line-discount">-₹{{ line.discount | number: '1.0-2' }} discount</p>
+              }
+            </ion-label>
+            <ion-label slot="end">₹{{ (line.subtotal - line.discount) | number: '1.0-2' }}</ion-label>
+          </ion-item>
+        }
+      </ion-list>
+
+      <ion-list inset>
+        <ion-item>
+          <ion-label>Total</ion-label>
+          <ion-label slot="end">₹{{ bill.total | number: '1.0-2' }}</ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label>Discount</ion-label>
+          <ion-label slot="end">-₹{{ bill.discount | number: '1.0-2' }}</ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label><strong>Grand Total</strong></ion-label>
+          <ion-label slot="end"><strong>₹{{ bill.grandTotal | number: '1.0-2' }}</strong></ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label>Amount Paid</ion-label>
+          <ion-label slot="end">₹{{ bill.amountPaid | number: '1.0-2' }}</ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label>Amount Due</ion-label>
+          <ion-label slot="end" [color]="bill.amountDue > 0 ? 'danger' : 'success'">₹{{ bill.amountDue | number: '1.0-2' }}</ion-label>
+        </ion-item>
+        @if (bill.paymentMethod) {
+          <ion-item>
+            <ion-label>Payment Method</ion-label>
+            <ion-label slot="end">{{ bill.paymentMethod | uppercase }}</ion-label>
+          </ion-item>
+        }
+        @if (bill.paymentMethod === 'cheque') {
+          <ion-item button (click)="editChequeNo()">
+            <ion-label>Cheque No.</ion-label>
+            <ion-label slot="end" [color]="bill.chequeNo ? undefined : 'medium'">{{ bill.chequeNo || '— tap to add' }}</ion-label>
+            <ion-icon slot="end" name="create-outline" color="medium"></ion-icon>
+          </ion-item>
+        }
+        @if (bill.pendingSync) {
+          <ion-item>
+            <ion-label color="warning">Pending sync</ion-label>
+          </ion-item>
+        }
+      </ion-list>
+
+      @if (bill.paymentStatus === 'pending') {
+        <ion-button expand="block" color="success" (click)="markAsPaid()">
+          <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
+          Mark as Paid
+        </ion-button>
+      } @else if (bill.paymentStatus === 'partial') {
+        <ion-button expand="block" color="success" (click)="recordPayment()">
+          <ion-icon slot="start" name="cash-outline"></ion-icon>
+          Record Payment
+        </ion-button>
+      }
+
+      <ion-button expand="block" fill="outline" class="ion-margin-top" (click)="sharePdf()" [disabled]="sharing">
+        <ion-icon slot="start" name="share-outline"></ion-icon>
+        Share / Print PDF
+      </ion-button>
+      <ion-button expand="block" fill="outline" class="ion-margin-top" (click)="startEdit()">
+        <ion-icon slot="start" name="create-outline"></ion-icon>
+        Edit Items
+      </ion-button>
+      <ion-button expand="block" fill="clear" color="danger" (click)="confirmDelete()">
+        <ion-icon slot="start" name="trash-outline"></ion-icon>
+        Delete Bill
+      </ion-button>
+    } @else {
+      <ion-list inset>
+        @for (line of editItems; track line.itemId) {
+          <ion-item class="edit-row">
+            <ion-label>
+              <h2>{{ line.itemName }}</h2>
+              <p>₹{{ line.price }} × {{ line.qty }} = ₹{{ line.subtotal | number: '1.0-2' }}</p>
+            </ion-label>
+            <div slot="end" class="edit-stepper">
+              <ion-button size="small" fill="outline" (click)="decEdit(line)">
+                <ion-icon slot="icon-only" name="remove-outline"></ion-icon>
+              </ion-button>
+              <span class="qty-value">{{ line.qty }}</span>
+              <ion-button size="small" fill="outline" (click)="incEdit(line)">
+                <ion-icon slot="icon-only" name="add-outline"></ion-icon>
+              </ion-button>
+              <ion-button size="small" color="danger" fill="clear" (click)="removeEditLine(line)" aria-label="Remove item">
+                <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+              </ion-button>
+            </div>
+          </ion-item>
+        }
+      </ion-list>
+
+      @if (editItems.length === 0) {
+        <p class="edit-warning">A bill needs at least one item. Add one back, or cancel and delete the whole bill instead.</p>
+      }
+
+      <ion-list inset>
+        <ion-item>
+          <ion-label>Total</ion-label>
+          <ion-label slot="end">₹{{ editTotal | number: '1.0-2' }}</ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label>Discount</ion-label>
+          <ion-label slot="end">-₹{{ editDiscount | number: '1.0-2' }}</ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label><strong>New Grand Total</strong></ion-label>
+          <ion-label slot="end"><strong>₹{{ editGrandTotal | number: '1.0-2' }}</strong></ion-label>
+        </ion-item>
+      </ion-list>
+
+      <ion-button expand="block" color="success" class="ion-margin-top" (click)="saveEdit()" [disabled]="editItems.length === 0 || saving">
+        <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
+        Save Changes
+      </ion-button>
+      <ion-button expand="block" fill="clear" color="medium" (click)="cancelEdit()">Cancel</ion-button>
+    }
+  }
+</ion-content>

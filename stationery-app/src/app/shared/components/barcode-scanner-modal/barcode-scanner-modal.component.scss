@@ -1,0 +1,50 @@
+:host {
+  display: block;
+  height: 100%;
+  background: transparent;
+}
+
+.scanner-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.scanner-top {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+
+.viewfinder-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.viewfinder {
+  width: 70vw;
+  max-width: 320px;
+  aspect-ratio: 1.6 / 1;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.35);
+}
+
+.hint {
+  color: #fff;
+  text-align: center;
+  padding: 0 24px;
+  font-size: 0.95rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.scanner-bottom {
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}

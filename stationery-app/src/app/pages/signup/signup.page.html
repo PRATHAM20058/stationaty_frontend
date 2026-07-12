@@ -1,0 +1,50 @@
+<ion-content class="ion-padding login-content">
+  <div class="login-wrap">
+    <div class="brand">
+      <ion-icon name="storefront-outline"></ion-icon>
+      <h1>Create Account</h1>
+      <p>Set up a login for your store</p>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <ion-item fill="outline" class="ion-margin-bottom">
+        <ion-label position="stacked">Full Name</ion-label>
+        <ion-input formControlName="name" placeholder="Enter your name" appEnterNext></ion-input>
+      </ion-item>
+
+      <ion-item fill="outline" class="ion-margin-bottom">
+        <ion-label position="stacked">Username</ion-label>
+        <ion-input formControlName="username" type="text" autocomplete="username" placeholder="Choose a username" appEnterNext></ion-input>
+      </ion-item>
+
+      <ion-item fill="outline" class="ion-margin-bottom">
+        <ion-label position="stacked">Password</ion-label>
+        <ion-input formControlName="password" type="password" autocomplete="new-password" placeholder="At least 6 characters" appEnterNext></ion-input>
+      </ion-item>
+
+      <ion-item fill="outline" class="ion-margin-bottom">
+        <ion-label position="stacked">Confirm Password</ion-label>
+        <ion-input formControlName="confirmPassword" type="password" autocomplete="new-password" placeholder="Re-enter password" appEnterNext></ion-input>
+      </ion-item>
+
+      @if (errorMessage) {
+        <ion-text color="danger">
+          <p class="error-text">{{ errorMessage }}</p>
+        </ion-text>
+      }
+
+      <ion-button expand="block" type="submit" size="large" [disabled]="loading">
+        @if (loading) {
+          <ion-spinner name="crescent"></ion-spinner>
+        } @else {
+          Create Account
+        }
+      </ion-button>
+    </form>
+
+    <div class="demo-hint">
+      <p>Already have an account?</p>
+      <ion-button expand="block" fill="outline" routerLink="/login">Back to Login</ion-button>
+    </div>
+  </div>
+</ion-content>

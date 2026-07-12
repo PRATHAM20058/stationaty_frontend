@@ -1,0 +1,645 @@
+/*
+ * App Global CSS — Premium Material 3 component system
+ * ----------------------------------------------------------------------------
+ * Visual-only styling. No app logic or markup behaviour depends on this file.
+ * Design tokens live in src/theme/variables.scss.
+ */
+
+/* Core CSS required for Ionic components to work properly */
+@import "@ionic/angular/css/core.css";
+
+/* Basic CSS for apps built with Ionic */
+@import "@ionic/angular/css/normalize.css";
+@import "@ionic/angular/css/structure.css";
+@import "@ionic/angular/css/typography.css";
+@import "@ionic/angular/css/display.css";
+
+/* Optional CSS utils that can be commented out */
+@import "@ionic/angular/css/padding.css";
+@import "@ionic/angular/css/float-elements.css";
+@import "@ionic/angular/css/text-alignment.css";
+@import "@ionic/angular/css/text-transformation.css";
+@import "@ionic/angular/css/flex-utils.css";
+
+/* Ionic Dark Mode (system) */
+@import '@ionic/angular/css/palettes/dark.system.css';
+
+/* ==========================================================================
+   1. Foundations — typography & rhythm
+   ========================================================================== */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.006em;
+}
+
+h1, h2, h3, h4 {
+  letter-spacing: -0.02em;
+  font-weight: var(--app-font-weight-bold);
+}
+
+ion-content {
+  // Keep bottom actions clear of the Android gesture / navigation bar (edge-to-edge)
+  --padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Gentle fade/rise for page content as you navigate — feels alive, not abrupt */
+.ion-page > ion-content::part(scroll) {
+  animation: app-content-in 0.34s var(--app-ease) both;
+}
+
+@keyframes app-content-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   2. Headers & toolbars — clean surface style (Notion/Linear feel)
+   ========================================================================== */
+ion-header {
+  &::after { display: none; } /* drop the default heavy hairline shadow */
+}
+
+ion-toolbar {
+  --border-width: 0;
+  --min-height: 58px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  --padding-start: 8px;
+  --padding-end: 8px;
+}
+
+/* The native status bar is kept non-overlapping (see AppComponent.initStatusBar),
+   so the WebView already starts below it on every device. Only add the true safe
+   inset (notch on iOS / edge-to-edge phones) plus a small breathing space — no
+   hard-coded minimum, which previously left a large empty gap on some OEMs. */
+ion-header ion-toolbar:first-of-type {
+  --padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+}
+
+/* Re-map primary-coloured toolbars to a clean surface with strong title.
+   This keeps every screen's header light, airy and premium. */
+ion-toolbar.ion-color-primary {
+  --ion-color-base: var(--ion-toolbar-background) !important;
+  --ion-color-contrast: var(--ion-text-color) !important;
+  --background: var(--ion-toolbar-background);
+  --color: var(--ion-text-color);
+}
+
+/* Hairline under the top-most toolbar of a header only */
+ion-header ion-toolbar:last-of-type {
+  box-shadow: 0 1px 0 var(--app-border);
+}
+
+ion-title {
+  font-size: 1.24rem;
+  font-weight: var(--app-font-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+/* Toolbar action buttons: comfortable, softly rounded targets */
+ion-toolbar ion-button {
+  --border-radius: 14px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  min-height: 42px;
+  font-weight: var(--app-font-weight-semibold);
+}
+ion-toolbar ion-button[slot="icon-only"],
+ion-menu-button,
+ion-back-button {
+  --border-radius: 50%;
+  --color: var(--ion-text-color);
+}
+
+/* ==========================================================================
+   3. Buttons — 20dp radius, 56dp actions, ripple (md), press-scale
+   ========================================================================== */
+ion-button {
+  --border-radius: var(--app-radius-lg);
+  --box-shadow: none;
+  --padding-top: 14px;
+  --padding-bottom: 14px;
+  --padding-start: 20px;
+  --padding-end: 20px;
+  --transition: transform 0.18s var(--app-ease), box-shadow 0.2s var(--app-ease),
+    background 0.2s var(--app-ease), opacity 0.2s var(--app-ease);
+  min-height: 48px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  font-weight: var(--app-font-weight-semibold);
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Primary action buttons — the 56dp, elevated hero buttons */
+ion-button[expand="block"],
+ion-button[expand="full"],
+ion-button[size="large"] {
+  min-height: 56px;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
+ion-button[fill="solid"],
+ion-button:not([fill]) {
+  --box-shadow: var(--app-shadow-primary);
+}
+ion-button[fill="outline"] {
+  --border-width: 1.5px;
+}
+ion-button[fill="clear"] {
+  --box-shadow: none;
+}
+
+/* Press scale + settle — snappy, physical feedback */
+ion-button:active {
+  transform: scale(0.965);
+}
+
+/* Small utility buttons (qty steppers, inline actions) stay compact */
+ion-button[size="small"] {
+  --border-radius: 12px;
+  --padding-start: 10px;
+  --padding-end: 10px;
+  min-height: 34px;
+  --box-shadow: none;
+}
+
+/* FAB */
+ion-fab-button {
+  --border-radius: 20px;
+  --box-shadow: var(--app-shadow-md);
+}
+
+/* ==========================================================================
+   4. Cards — rounded, soft shadow, subtle press
+   ========================================================================== */
+ion-card {
+  border-radius: var(--app-radius-xl);
+  box-shadow: var(--app-shadow-sm);
+  border: 1px solid var(--app-border);
+  margin: 10px 8px;
+  transition: box-shadow 0.25s var(--app-ease), transform 0.2s var(--app-ease);
+}
+ion-card[button]:active,
+ion-card.pending-card:active {
+  transform: scale(0.985);
+  box-shadow: var(--app-shadow-md);
+}
+
+ion-card-header { padding: 18px 18px 4px; }
+ion-card-content { padding: 12px 18px 18px; }
+ion-card-title {
+  font-weight: var(--app-font-weight-bold);
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   5. Lists & items — spacious rows, large touch targets
+   ========================================================================== */
+ion-list {
+  background: transparent;
+  padding: 6px 0;
+}
+
+ion-item {
+  --background: var(--ion-item-background);
+  --border-color: var(--app-border);
+  --border-radius: var(--app-radius-md);
+  --min-height: 60px;
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+  --transition: background 0.2s var(--app-ease), box-shadow 0.25s var(--app-ease);
+}
+
+/* Trailing content (status/stock badges, amount columns) must never be
+   squeezed or clipped by the rounded, overflow-hidden sliding row — keep it at
+   full size with a little breathing room from the label. */
+ion-item [slot="end"] {
+  flex-shrink: 0;
+  margin-inline-start: 10px;
+}
+ion-item ion-badge[slot="end"] {
+  max-width: none;
+  white-space: nowrap;
+}
+
+/* List rows read as soft, separated cards */
+ion-content ion-list > ion-item,
+ion-content ion-list > ion-item-sliding {
+  margin: 6px 12px;
+}
+/* Ionic's sliding host is width:100%, which ignores the side margins above and
+   pushes the card past the right screen edge, clipping trailing badges. */
+ion-content ion-list > ion-item-sliding {
+  width: auto;
+}
+ion-content ion-list > ion-item-sliding ion-item {
+  --border-radius: var(--app-radius-md);
+  margin: 0;
+}
+ion-item-sliding {
+  border-radius: var(--app-radius-md);
+  overflow: hidden;
+  box-shadow: var(--app-shadow-xs);
+}
+ion-content ion-list > ion-item,
+ion-item-sliding {
+  box-shadow: var(--app-shadow-xs);
+}
+
+ion-item h2 {
+  font-weight: var(--app-font-weight-semibold);
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+ion-item p {
+  color: var(--ion-color-step-500);
+  font-size: 0.85rem;
+}
+
+ion-item-option {
+  font-weight: var(--app-font-weight-semibold);
+}
+
+/* Menu list rows */
+ion-menu ion-item {
+  --border-radius: 14px;
+  --min-height: 52px;
+  margin: 4px 10px;
+  font-weight: var(--app-font-weight-medium);
+}
+
+/* ==========================================================================
+   6. Text fields — rounded filled, animated border, error shake
+   ========================================================================== */
+ion-item[fill="outline"],
+ion-item[fill="solid"] {
+  --border-radius: var(--app-radius-lg);
+  --border-width: 1.5px;
+  --border-color: var(--app-border-strong);
+  --highlight-height: 2px;
+  --background: var(--app-surface);
+  --padding-start: 16px;
+  --min-height: 60px;
+  margin-bottom: 14px;
+  box-shadow: none;
+  transition: box-shadow 0.22s var(--app-ease), border-color 0.22s var(--app-ease);
+}
+
+/* Soft filled tint + focus ring that animates in */
+ion-item[fill="outline"].item-has-focus,
+ion-item[fill="solid"].item-has-focus,
+ion-item[fill="outline"]:focus-within,
+ion-item[fill="solid"]:focus-within {
+  --border-color: var(--ion-color-primary);
+  box-shadow: 0 0 0 4px rgba(var(--ion-color-primary-rgb), 0.14);
+}
+
+/* Floating / stacked labels */
+ion-label[position="stacked"] {
+  font-weight: var(--app-font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--ion-color-step-600);
+}
+ion-item.item-has-focus ion-label[position="stacked"] {
+  color: var(--ion-color-primary);
+}
+
+/* Clean placeholders */
+ion-input, ion-textarea, ion-select {
+  --placeholder-color: var(--ion-color-step-400);
+  --placeholder-opacity: 1;
+  font-size: 1rem;
+}
+
+/* Leading icons inside fields */
+ion-item[fill] ion-icon[slot="start"] {
+  color: var(--ion-color-step-500);
+  margin-inline-end: 12px;
+  transition: color 0.2s var(--app-ease);
+}
+ion-item[fill].item-has-focus ion-icon[slot="start"] {
+  color: var(--ion-color-primary);
+}
+
+/* Invalid, touched fields flag danger + a single gentle shake */
+ion-item[fill].ion-invalid.ion-touched {
+  --border-color: var(--ion-color-danger);
+  box-shadow: 0 0 0 4px rgba(var(--ion-color-danger-rgb), 0.12);
+  animation: app-field-shake 0.32s var(--app-ease);
+}
+@keyframes app-field-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+
+/* ==========================================================================
+   7. Searchbar — rounded, filled, elevated
+   ========================================================================== */
+ion-searchbar {
+  --border-radius: var(--app-radius-lg) !important;
+  --background: var(--app-surface-variant);
+  --box-shadow: none;
+  --icon-color: var(--ion-color-step-500);
+  --placeholder-color: var(--ion-color-step-400);
+  --color: var(--ion-text-color);
+  padding: 6px 10px !important;
+}
+ion-searchbar .searchbar-input {
+  box-shadow: none !important;
+  font-size: 0.95rem;
+  transition: box-shadow 0.2s var(--app-ease);
+}
+ion-searchbar.searchbar-has-focus .searchbar-input {
+  box-shadow: 0 0 0 3px rgba(var(--ion-color-primary-rgb), 0.16) !important;
+}
+
+/* ==========================================================================
+   8. Segments — Material 3 sliding pill
+   ========================================================================== */
+ion-segment {
+  --background: var(--app-surface-variant);
+  border-radius: var(--app-radius-pill);
+  padding: 4px;
+  contain: paint;
+}
+ion-segment-button {
+  --background: transparent;
+  --background-checked: transparent;
+  --color: var(--ion-color-step-600);
+  --color-checked: var(--ion-color-primary);
+  --indicator-color: transparent;
+  --border-radius: var(--app-radius-pill);
+  min-height: 40px;
+  text-transform: none;
+  font-weight: var(--app-font-weight-semibold);
+  letter-spacing: -0.01em;
+}
+ion-segment-button::part(indicator-background) {
+  height: 100%;
+  border-radius: var(--app-radius-pill);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-xs);
+}
+ion-segment-button:active { transform: scale(0.97); }
+
+/* ==========================================================================
+   9. Chips — pill filter chips with clear selected state
+   ========================================================================== */
+ion-chip {
+  border-radius: var(--app-radius-pill);
+  font-weight: var(--app-font-weight-semibold);
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--app-border);
+  transition: transform 0.15s var(--app-ease), background 0.2s var(--app-ease),
+    color 0.2s var(--app-ease);
+}
+ion-chip.ion-color-primary {
+  --ion-color-base: rgba(var(--ion-color-primary-rgb), 0.12) !important;
+  --ion-color-contrast: var(--ion-color-primary) !important;
+  border-color: transparent;
+}
+ion-chip:active { transform: scale(0.96); }
+
+/* Horizontal chip rows scroll cleanly */
+.chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 12px;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+  ion-chip { flex: 0 0 auto; margin: 0; }
+}
+
+/* ==========================================================================
+   10. Badges — soft pills
+   ========================================================================== */
+ion-badge {
+  border-radius: var(--app-radius-pill);
+  font-weight: var(--app-font-weight-bold);
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+  padding: 6px 11px;
+  text-transform: none;
+}
+
+/* ==========================================================================
+   11. Tab bar — elevated, rounded, active pill indicator
+   ========================================================================== */
+ion-tab-bar {
+  --background: var(--ion-tab-bar-background);
+  --border: 0;
+  border-top: 1px solid var(--app-border);
+  box-shadow: 0 -6px 24px rgba(23, 25, 45, 0.05);
+  /* Grow with the safe area so the usable content height stays constant and the
+     selected tab's label never gets clipped at the bottom. */
+  height: calc(72px + env(safe-area-inset-bottom));
+  padding: 8px 6px calc(6px + env(safe-area-inset-bottom));
+}
+ion-tab-button {
+  --color: var(--ion-color-step-500);
+  --color-selected: var(--ion-color-primary);
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  font-weight: var(--app-font-weight-semibold);
+  transition: color 0.2s var(--app-ease);
+}
+ion-tab-button ion-icon {
+  font-size: 24px;
+  transition: transform 0.22s var(--app-ease-emphasized);
+}
+ion-tab-button ion-label {
+  font-size: 0.7rem;
+  margin-top: 3px;
+  letter-spacing: -0.01em;
+}
+/* Selected tab: soft pill behind the icon */
+ion-tab-button.tab-selected ion-icon {
+  transform: scale(1.04);
+  background: rgba(var(--ion-color-primary-rgb), 0.12);
+  border-radius: var(--app-radius-pill);
+  padding: 3px 16px;
+}
+
+/* ==========================================================================
+   12. Feedback surfaces — modals, alerts, toasts, loading, refresher
+   ========================================================================== */
+ion-modal {
+  --border-radius: var(--app-radius-xl);
+  --box-shadow: var(--app-shadow-lg);
+}
+ion-modal::part(handle) {
+  width: 44px;
+  background: var(--ion-color-step-300);
+}
+
+/* Compact, centered calendar for the Bills "From date" filter (overlay lives
+   outside the component, so it must be sized here in global styles). */
+ion-modal.date-filter-modal {
+  --width: fit-content;
+  --min-width: 320px;
+  --height: fit-content;
+  --border-radius: var(--app-radius-xl);
+  --box-shadow: var(--app-shadow-lg);
+  align-items: center;
+  justify-content: center;
+
+  ion-datetime {
+    margin: 0 auto;
+  }
+}
+
+.alert-wrapper.ion-overlay-wrapper,
+ion-alert .alert-wrapper {
+  border-radius: var(--app-radius-lg) !important;
+  box-shadow: var(--app-shadow-lg);
+}
+ion-alert .alert-button {
+  border-radius: 12px;
+  font-weight: var(--app-font-weight-semibold);
+  text-transform: none;
+}
+
+ion-toast {
+  --border-radius: var(--app-radius-md);
+  --box-shadow: var(--app-shadow-md);
+  font-weight: var(--app-font-weight-medium);
+}
+
+ion-action-sheet .action-sheet-group {
+  border-radius: var(--app-radius-lg) !important;
+}
+
+ion-loading, ion-picker {
+  --border-radius: var(--app-radius-lg);
+}
+
+ion-refresher ion-spinner,
+ion-spinner {
+  color: var(--ion-color-primary);
+}
+
+/* ==========================================================================
+   13. Reusable premium empty-state
+   ========================================================================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 56px 32px;
+  min-height: 60vh;
+  animation: app-content-in 0.4s var(--app-ease) both;
+
+  .empty-state-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 96px;
+    height: 96px;
+    margin-bottom: 20px;
+    border-radius: 28px;
+    background: linear-gradient(
+      145deg,
+      rgba(var(--ion-color-primary-rgb), 0.14),
+      rgba(var(--ion-color-primary-rgb), 0.05)
+    );
+    color: var(--ion-color-primary);
+
+    ion-icon { font-size: 46px; }
+  }
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 1.2rem;
+    font-weight: var(--app-font-weight-bold);
+    color: var(--ion-text-color);
+  }
+
+  p {
+    margin: 0;
+    max-width: 300px;
+    color: var(--ion-color-step-500);
+    font-size: 0.94rem;
+    line-height: 1.5;
+  }
+
+  ion-button { margin-top: 22px; }
+}
+
+/* Section titles used across pages */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 4px 10px;
+  font-size: 1.05rem;
+  font-weight: var(--app-font-weight-bold);
+  letter-spacing: -0.01em;
+
+  ion-icon { color: var(--ion-color-primary); font-size: 1.15rem; }
+}
+
+/* "Pending sync" inline tag, shown across item/bill/category lists */
+.pending-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px !important;
+  padding: 2px 9px;
+  border-radius: var(--app-radius-pill);
+  background: rgba(var(--ion-color-warning-rgb), 0.16);
+  color: var(--ion-color-warning-shade) !important;
+  font-size: 0.72rem !important;
+  font-weight: var(--app-font-weight-semibold);
+}
+
+/* Skeletons pick up the rounded language */
+ion-skeleton-text {
+  border-radius: 8px;
+  --background-rgb: var(--ion-text-color-rgb);
+}
+
+/* Subtle, modern scrollbars on web */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--ion-text-color-rgb), 0.16);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--ion-text-color-rgb), 0.28);
+  background-clip: content-box;
+}
+
+/* ==========================================================================
+   14. Barcode scanner camera preview (FUNCTIONAL — do not restyle away)
+   --------------------------------------------------------------------------
+   @capacitor-mlkit/barcode-scanning renders the native camera feed *behind*
+   the WebView. Everything in the DOM must be hidden/transparent while scanning
+   so the camera shows through, except the scanner modal itself.
+   ========================================================================== */
+body.barcode-scanner-active {
+  visibility: hidden;
+  --background: transparent;
+  --ion-background-color: transparent;
+}
+
+.barcode-scanner-modal {
+  visibility: visible;
+  --background: transparent;
+  --ion-background-color: transparent;
+
+  &::part(content) {
+    background: transparent;
+  }
+}

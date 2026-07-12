@@ -1,0 +1,73 @@
+.login-content {
+  --background: radial-gradient(
+      120% 90% at 50% -10%,
+      rgba(var(--ion-color-primary-rgb), 0.16) 0%,
+      rgba(var(--ion-color-primary-rgb), 0) 55%
+    ),
+    var(--ion-background-color);
+}
+
+.login-wrap {
+  max-width: 420px;
+  margin: 0 auto;
+  padding-top: calc(9vh + env(safe-area-inset-top, 0px));
+  animation: login-rise 0.5s var(--app-ease) both;
+}
+
+@keyframes login-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.brand {
+  text-align: center;
+  margin-bottom: 36px;
+
+  ion-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 84px;
+    height: 84px;
+    font-size: 42px;
+    color: var(--ion-color-primary-contrast);
+    background: linear-gradient(145deg, var(--ion-color-primary-tint), var(--ion-color-primary-shade));
+    border-radius: 26px;
+    box-shadow: var(--app-shadow-primary);
+  }
+
+  h1 {
+    margin: 18px 0 6px;
+    font-size: 1.75rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  p {
+    color: var(--ion-color-step-500);
+    margin: 0;
+    font-size: 0.98rem;
+  }
+}
+
+.error-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 12px 4px;
+}
+
+.demo-hint {
+  margin-top: 28px;
+  padding: 18px;
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface-variant);
+  border: 1px solid var(--app-border);
+
+  p {
+    font-size: 0.86rem;
+    color: var(--ion-color-step-500);
+    text-align: center;
+    margin: 0 0 12px;
+    line-height: 1.5;
+  }
+}

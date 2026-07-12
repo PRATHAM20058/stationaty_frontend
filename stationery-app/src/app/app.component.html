@@ -1,0 +1,34 @@
+<ion-app>
+  <ion-split-pane contentId="main-content" [disabled]="!(currentUser$ | async)">
+    <ion-menu contentId="main-content" type="overlay" [disabled]="!(currentUser$ | async)">
+      <ion-header>
+        <ion-toolbar color="primary">
+          <ion-title>Stationery Shop</ion-title>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content>
+        <ion-list lines="none">
+          <ion-menu-toggle auto-hide="true">
+            <ion-item button routerLink="/categories" routerDirection="forward">
+              <ion-icon slot="start" name="pricetags-outline"></ion-icon>
+              Categories
+            </ion-item>
+            <ion-item button routerLink="/settings" routerDirection="forward">
+              <ion-icon slot="start" name="settings-outline"></ion-icon>
+              Settings
+            </ion-item>
+          </ion-menu-toggle>
+          <ion-item button (click)="logout()">
+            <ion-icon slot="start" name="log-out-outline"></ion-icon>
+            Logout
+          </ion-item>
+        </ion-list>
+      </ion-content>
+    </ion-menu>
+
+    <div class="ion-page" id="main-content">
+      <app-offline-banner></app-offline-banner>
+      <ion-router-outlet></ion-router-outlet>
+    </div>
+  </ion-split-pane>
+</ion-app>

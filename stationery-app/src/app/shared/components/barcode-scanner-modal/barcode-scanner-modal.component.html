@@ -1,0 +1,25 @@
+<div class="scanner-overlay">
+  <div class="scanner-top">
+    <ion-button fill="clear" color="light" (click)="cancel()">
+      <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+    </ion-button>
+
+    @if (scanning) {
+      <ion-button fill="clear" color="light" (click)="toggleTorch()">
+        <ion-icon slot="icon-only" [name]="torchOn ? 'flash-off-outline' : 'flash-outline'"></ion-icon>
+      </ion-button>
+    }
+  </div>
+
+  <div class="viewfinder-wrap">
+    <div class="viewfinder"></div>
+    <p class="hint">{{ statusMessage }}</p>
+  </div>
+
+  <div class="scanner-bottom">
+    <ion-button expand="block" fill="solid" color="light" (click)="pickFromGallery()">
+      <ion-icon slot="start" name="image-outline"></ion-icon>
+      Choose from Gallery
+    </ion-button>
+  </div>
+</div>

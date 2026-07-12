@@ -1,0 +1,170 @@
+.cart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 24px;
+  border: 1.5px dashed var(--app-border-strong);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-surface-muted);
+
+  .cart-empty-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    margin-bottom: 12px;
+    border-radius: 20px;
+    background: rgba(var(--ion-color-primary-rgb), 0.1);
+    color: var(--ion-color-primary);
+    ion-icon { font-size: 30px; }
+  }
+
+  p { margin: 0; color: var(--ion-color-step-500); font-size: 0.92rem; }
+}
+
+.search-results {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.category-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 8px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar { display: none; }
+  ion-chip { flex: 0 0 auto; margin: 2px 0; }
+}
+
+.results-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ion-color-step-500);
+}
+
+.cart-row {
+  --min-height: 64px;
+}
+
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  /* Compact override -- the app's global ion-button rule pads every button for a
+     comfortable primary tap target, which is far too wide for four controls packed
+     into a single cart row alongside the item name. */
+  ion-button {
+    width: 30px;
+    height: 30px;
+    min-height: 30px;
+    margin: 0;
+    --padding-start: 0;
+    --padding-end: 0;
+    --box-shadow: none;
+  }
+
+  .qty-value {
+    width: 44px;
+    flex: 0 0 44px;
+    text-align: center;
+    font-weight: 600;
+    --padding-start: 4px;
+    --padding-end: 4px;
+    --padding-top: 4px;
+    --padding-bottom: 4px;
+
+    input {
+      text-align: center;
+    }
+  }
+}
+
+.line-discount {
+  color: var(--ion-color-warning-shade, var(--ion-color-warning));
+  font-weight: 600;
+}
+
+.discount-editor {
+  --min-height: 0;
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+  --background: var(--app-surface-muted);
+  --border-radius: var(--app-radius-md);
+}
+
+.discount-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 0;
+
+  ion-segment {
+    flex: 0 0 auto;
+    width: 104px;
+  }
+
+  /* Ionic segment-buttons default to a ~90px min-width; without this the two
+     buttons overflow the narrow toggle and the ₹ / % get clipped. */
+  ion-segment-button {
+    min-width: 0;
+  }
+
+  .discount-editor-input {
+    flex: 1;
+    --padding-start: 8px;
+    border: 1px solid var(--ion-color-medium-tint);
+    border-radius: 6px;
+  }
+}
+
+.totals {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow-sm);
+  border-radius: var(--app-radius-lg);
+  padding: 16px 18px;
+  margin: 12px 0;
+
+  .totals-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    color: var(--ion-color-step-600);
+    font-size: 0.95rem;
+  }
+
+  .grand {
+    font-weight: 800;
+    font-size: 1.25rem;
+    color: var(--ion-text-color);
+    border-top: 1px solid var(--app-border);
+    margin-top: 6px;
+    padding-top: 12px;
+  }
+}
+
+.due-line {
+  color: var(--ion-color-danger);
+  font-weight: 600;
+}
+
+.generate-btn {
+  --padding-top: 20px;
+  --padding-bottom: 20px;
+  font-size: 1.1rem;
+  margin-bottom: 24px;
+}

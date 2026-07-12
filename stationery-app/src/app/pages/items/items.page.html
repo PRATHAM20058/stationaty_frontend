@@ -1,0 +1,80 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Items</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="goToNew()">
+        <ion-icon slot="icon-only" name="add-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-searchbar
+      placeholder="Search name, SKU or godown location"
+      [debounce]="300"
+      (ionInput)="onSearch($any($event.target).value)"
+    ></ion-searchbar>
+  </ion-toolbar>
+  @if (categories.length > 0) {
+    <ion-toolbar>
+      <div class="chip-row">
+        @for (category of categories; track category.id) {
+          <ion-chip [color]="selectedCategoryId === category.id ? 'primary' : 'medium'" (click)="selectCategory(category.id)">
+            <ion-label>{{ category.name }}</ion-label>
+          </ion-chip>
+        }
+      </div>
+    </ion-toolbar>
+  }
+</ion-header>
+
+<ion-content>
+  @if (loading) {
+    <ion-list>
+      @for (i of [1, 2, 3, 4, 5]; track i) {
+        <ion-item>
+          <ion-label><ion-skeleton-text animated style="width: 70%"></ion-skeleton-text></ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  } @else if (items.length === 0) {
+    <div class="empty-state">
+      <div class="empty-state-icon"><ion-icon name="cube-outline"></ion-icon></div>
+      <h3>No items found</h3>
+      <p>Try a different search or category, or add your first item to get started.</p>
+      <ion-button (click)="goToNew()">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        Add Item
+      </ion-button>
+    </div>
+  } @else {
+    <ion-list>
+      @for (item of items; track item.id) {
+        <ion-item-sliding #slidingItem>
+          <ion-item button (click)="goToDetail(item)">
+            <ion-label>
+              <h2>{{ item.name }}</h2>
+              <p>{{ item.category }} · {{ item.godownLocation || 'No location' }}</p>
+              @if (item.pendingSync) {
+                <p class="pending-tag">Pending sync</p>
+              }
+            </ion-label>
+            <ion-badge slot="end" [color]="item.stockQty <= lowStockThreshold ? 'danger' : 'success'">
+              {{ item.stockQty }} {{ item.unit }}
+            </ion-badge>
+          </ion-item>
+          <ion-item-options side="end">
+            <ion-item-option color="primary" (click)="goToEdit(item)">
+              <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+            </ion-item-option>
+            <ion-item-option color="danger" (click)="confirmDelete(item, slidingItem)">
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-item-option>
+          </ion-item-options>
+        </ion-item-sliding>
+      }
+    </ion-list>
+  }
+</ion-content>
