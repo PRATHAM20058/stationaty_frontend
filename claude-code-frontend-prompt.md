@@ -154,4 +154,3 @@ Build this step by step: scaffold project → models/services → auth → categ
 - If you want offline billing to be robust, consider asking Claude Code to use `@capacitor-community/sqlite` instead of Preferences — mention that upfront if you want it
 
 
-hi
