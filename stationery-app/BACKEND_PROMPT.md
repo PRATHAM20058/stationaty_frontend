@@ -18,8 +18,7 @@ backend is the shared source of truth that multiple devices sync against.
 
 The app id / product context:
 - App id: `com.mystore.stationery`
-- Production API base URL the app is configured for: `https://mystore.duckdns.org/api`
-  (dev build points at `http://localhost:3000/api`)
+- The backend runs locally on macOS; API base URL the app is configured for: `http://localhost:3000/api`
 - The frontend attaches `Authorization: Bearer <jwt>` to every request except `POST /auth/login`,
   and logs the user out on any `401`.
 
@@ -84,7 +83,7 @@ DB_NAME=stationery
 JWT_SECRET=replace-with-a-long-random-string
 JWT_EXPIRES_IN=30d
 # Comma-separated allowed origins for CORS (Ionic dev server + prod site).
-CORS_ORIGINS=http://localhost:8100,https://mystore.duckdns.org,capacitor://localhost,http://localhost
+CORS_ORIGINS=http://localhost:8100,capacitor://localhost,http://localhost
 ```
 
 > The Android app (Capacitor) issues requests from origins like `capacitor://localhost` /
