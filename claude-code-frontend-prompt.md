@@ -152,6 +152,3 @@ Build this step by step: scaffold project → models/services → auth → categ
 - Have Node.js and the Ionic CLI installed (`npm install -g @ionic/cli`) before starting
 - Decide your home server's domain (via DuckDNS or Cloudflare Tunnel) ahead of time so you can plug it into `environment.ts`
 - If you want offline billing to be robust, consider asking Claude Code to use `@capacitor-community/sqlite` instead of Preferences — mention that upfront if you want it
-
-
-git not
