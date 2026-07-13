@@ -93,6 +93,8 @@ export class DashboardPage implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    // Pull the latest bills from the backend, then re-render (offline-safe: ignore failures).
+    this.billingService.refreshFromServer().then(() => this.load()).catch(() => {});
     // Live-refresh when a bill is created/paid/edited/deleted elsewhere, so this cached
     // tab is already up to date whenever the user returns to it (by any navigation path).
     this.billingService.changes$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());

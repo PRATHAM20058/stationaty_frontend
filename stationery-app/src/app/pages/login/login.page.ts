@@ -71,7 +71,9 @@ export class LoginPage {
     try {
       const { username, password } = this.form.getRawValue();
       await this.auth.login(username!, password!);
-      this.router.navigateByUrl('/tabs/dashboard', { replaceUrl: true });
+      // Full reload so every cached tab page is rebuilt for this user -- otherwise Ionic keeps
+      // the previous user's dashboard/list instances alive and briefly shows their data.
+      window.location.href = '/';
     } catch (err: any) {
       this.errorMessage = err?.status === 401 ? 'Invalid username or password' : 'Could not reach the server. Check your connection.';
       const toast = await this.toastController.create({ message: this.errorMessage, duration: 2500, color: 'danger' });

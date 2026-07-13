@@ -80,9 +80,15 @@ export class SignupPage {
     try {
       const { name, username, password } = this.form.getRawValue();
       await this.auth.signup(name!, username!, password!);
-      this.router.navigateByUrl('/tabs/dashboard', { replaceUrl: true });
+      // Full reload so every cached tab page is rebuilt for the new (empty) account.
+      window.location.href = '/';
     } catch (err: any) {
-      this.errorMessage = err?.message === 'Username already taken' ? 'That username is already taken' : 'Could not create account';
+      const taken = err?.status === 409 || err?.error?.message === 'Username already taken';
+      this.errorMessage = taken
+        ? 'That username is already taken'
+        : err?.status === 0
+          ? 'Could not reach the server. Check your connection.'
+          : 'Could not create account';
       const toast = await this.toastController.create({ message: this.errorMessage, duration: 2500, color: 'danger' });
       await toast.present();
     } finally {

@@ -154,6 +154,24 @@ export class SqliteService {
     await this.persistWebStore();
   }
 
+  /**
+   * Wipes the local domain cache (categories/items/bills + the sync queue) so a session
+   * starts clean. Called on login/logout: the cache is per-device but data is now per-user
+   * on the server, so we must not let one user's cached rows leak into another's session.
+   * Leaves auth_users (local account list) intact.
+   */
+  async clearUserData(): Promise<void> {
+    await this.readyPromise;
+    await this.db.execute(`
+      DELETE FROM sync_queue;
+      DELETE FROM bill_items;
+      DELETE FROM bills;
+      DELETE FROM items;
+      DELETE FROM categories;
+    `);
+    await this.persistWebStore();
+  }
+
   private async persistWebStore(): Promise<void> {
     if (Capacitor.getPlatform() === 'web') {
       await this.sqlite.saveToStore(DB_NAME);
