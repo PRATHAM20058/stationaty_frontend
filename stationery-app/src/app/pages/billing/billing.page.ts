@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -96,6 +97,8 @@ export class BillingPage implements OnInit {
   pendingCount = 0;
   saving = false;
 
+  private destroyRef = inject(DestroyRef);
+
   constructor(
     private itemService: ItemService,
     private billingService: BillingService,
@@ -110,6 +113,11 @@ export class BillingPage implements OnInit {
   async ngOnInit(): Promise<void> {
     await this.refreshPendingCount();
     await this.loadCategories();
+    // Recording a payment / marking a bill paid happens on the pending-bills and bill-detail
+    // pages, which open as top-level routes over the tabs shell -- so this tab's
+    // ionViewWillEnter does NOT fire on return. Subscribe to bill changes so the "Pending"
+    // badge count stays accurate.
+    this.billingService.changes$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.refreshPendingCount());
   }
 
   async ionViewWillEnter(): Promise<void> {

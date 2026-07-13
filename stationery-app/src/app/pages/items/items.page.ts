@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import {
@@ -66,6 +67,8 @@ export class ItemsPage implements OnInit {
   selectedCategoryId: string | null = null;
   lowStockThreshold = environment.lowStockThreshold;
 
+  private destroyRef = inject(DestroyRef);
+
   constructor(
     private itemService: ItemService,
     private categoryService: CategoryService,
@@ -79,6 +82,10 @@ export class ItemsPage implements OnInit {
   ngOnInit(): void {
     this.load();
     this.itemService.refreshFromServer().then(() => this.load()).catch(() => {});
+    // Item edit/add opens as a top-level route on top of the tabs shell, so this page's
+    // ionViewWillEnter does NOT fire when the user returns after changing stock qty.
+    // Subscribe to item changes so the list (and stock badges) stay in sync.
+    this.itemService.changes$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
   }
 
   async ionViewWillEnter(): Promise<void> {

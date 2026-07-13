@@ -12,7 +12,14 @@
       "Bash(/Users/parmarpratham/Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager --list_installed)",
       "Bash(npx ng *)",
       "Bash(npx cap *)",
-      "Bash(ANDROID_HOME=/Users/parmarpratham/Library/Android/sdk ./gradlew assembleDebug)"
+      "Bash(ANDROID_HOME=/Users/parmarpratham/Library/Android/sdk ./gradlew assembleDebug)",
+      "Bash(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 \"/Users/parmarpratham/Desktop/Screen Recording 2026-07-13 at 10.17.00 AM.mov\")",
+      "Bash(/usr/bin/qlmanage -x -t -s 800 \"/Users/parmarpratham/Desktop/Screen Recording 2026-07-13 at 10.17.00 AM.mov\" -o .)",
+      "Bash(cp \"/Users/parmarpratham/Desktop/Screen Recording 2026-07-13 at 10.17.00 AM.mov\" /private/tmp/claude-501/-Users-parmarpratham-Desktop-mystore/e34e59ae-3eac-48b6-b17f-7274917910ed/scratchpad/rec.mov)",
+      "Bash(sed 's#/Users/parmarpratham/Desktop/Screen Recording 2026-07-13 at 10.17.00 AM.mov#/private/tmp/claude-501/-Users-parmarpratham-Desktop-mystore/e34e59ae-3eac-48b6-b17f-7274917910ed/scratchpad/rec.mov#' /private/tmp/claude-501/-Users-parmarpratham-Desktop-mystore/e34e59ae-3eac-48b6-b17f-7274917910ed/scratchpad/grab.swift)",
+      "Bash(swift /private/tmp/claude-501/-Users-parmarpratham-Desktop-mystore/e34e59ae-3eac-48b6-b17f-7274917910ed/scratchpad/grab2.swift)",
+      "Read(//Users/parmarpratham/Desktop/**)",
+      "Bash(python3 -c \"import shutil; shutil.copyfile\\('/Users/parmarpratham/Desktop/Screen Recording 2026-07-13 at 10.17.00 AM.mov','/private/tmp/claude-501/-Users-parmarpratham-Desktop-mystore/e34e59ae-3eac-48b6-b17f-7274917910ed/scratchpad/rec.mov'\\); print\\('ok'\\)\")"
     ]
   }
 }

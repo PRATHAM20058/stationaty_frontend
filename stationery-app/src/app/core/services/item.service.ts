@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subject } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Item } from '../models/item.model';
 import { SqliteService } from './sqlite.service';
@@ -14,6 +14,11 @@ export interface ItemFilter {
 
 @Injectable({ providedIn: 'root' })
 export class ItemService implements SyncableEntityService {
+  private readonly _changes = new Subject<void>();
+  /** Emits after any local item create/update/delete (including stock adjustments from
+      billing) so list pages can live-refresh even while they're a backgrounded cached tab. */
+  readonly changes$ = this._changes.asObservable();
+
   constructor(
     private http: HttpClient,
     private sqlite: SqliteService,
@@ -133,6 +138,8 @@ export class ItemService implements SyncableEntityService {
       `INSERT INTO sync_queue (entity_type, action, entity_id, payload, status, created_at) VALUES ('item', ?, ?, ?, 'pending', ?)`,
       [action, entityId, JSON.stringify(payload), new Date().toISOString()],
     );
+    // Every user-initiated item mutation funnels through here -- notify subscribed list/summary pages.
+    this._changes.next();
   }
 
   // --- SyncableEntityService: called by SyncService while draining the queue ---

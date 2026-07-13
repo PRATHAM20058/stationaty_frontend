@@ -1,4 +1,5 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, DestroyRef, OnInit, ViewChild, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -58,6 +59,8 @@ type StatusFilter = 'all' | PaymentStatus;
 export class BillHistoryPage implements OnInit {
   @ViewChild('dateModal') dateModal!: IonModal;
 
+  private destroyRef = inject(DestroyRef);
+
   bills: Bill[] = [];
   loading = true;
   statusFilter: StatusFilter = 'all';
@@ -83,6 +86,10 @@ export class BillHistoryPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.load();
+    // A bill detail page opens as a top-level route on top of the tabs shell, so this
+    // page's ionViewWillEnter does NOT fire when the user returns from recording a
+    // payment or editing a bill. Subscribe to bill changes so the list stays in sync.
+    this.billingService.changes$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
   }
 
   async ionViewWillEnter(): Promise<void> {

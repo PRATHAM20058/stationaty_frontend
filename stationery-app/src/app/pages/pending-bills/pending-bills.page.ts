@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -53,6 +54,8 @@ export class PendingBillsPage implements OnInit {
 
   totalDue = 0;
 
+  private destroyRef = inject(DestroyRef);
+
   constructor(
     private billingService: BillingService,
     private router: Router,
@@ -62,6 +65,10 @@ export class PendingBillsPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.load();
+    // The bill detail page opens as a top-level route over the tabs shell, so returning
+    // from it does not always re-fire ionViewWillEnter here. Subscribe to bill changes
+    // so a recorded payment / edit is reflected in this list right away.
+    this.billingService.changes$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
   }
 
   async ionViewWillEnter(): Promise<void> {
