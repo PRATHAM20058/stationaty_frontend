@@ -1,5 +1,12 @@
 # API Contract
 
+This document is the transport-level contract: the exact endpoints, request/response shapes,
+and status codes the frontend already calls. For a full, build-ready backend spec (Node.js +
+Express + Homebrew MySQL — schema DDL, auth/seeding, business rules, project layout, acceptance
+checklist), see **`BACKEND_PROMPT.md`**, which is written to be handed straight to an AI assistant
+or followed by hand. If the two ever disagree, this file (what the client actually sends/expects)
+is authoritative.
+
 Base URL is whatever `environment.apiUrl` is set to (e.g. `https://mystore.duckdns.org/api`).
 All endpoints below are relative to that base. All requests except `POST /auth/login`
 must include `Authorization: Bearer <jwt>` (attached automatically by the app's HTTP
@@ -105,10 +112,15 @@ Returns all bills (frontend filters by date/status/customer locally).
 ```
 
 ### `POST /bills`
-Request body: bill fields minus `id` (the app generates a temporary `billNo` and `id`
-locally when offline; the server's response values replace them once synced).
-Response `201`: full bill including server-assigned `id` and `billNo`. Expected to
-also decrement the corresponding items' stock server-side.
+Request body: the full bill object. The app generates a temporary `billNo` and `id`
+locally (offline or not) and includes them, but the server should **ignore** them and
+assign its own; the server's response values replace them once synced.
+Response `201`: full bill including server-assigned `id` and `billNo`.
+
+**Do not decrement item stock on this endpoint.** Stock is client-authoritative: when a
+bill is created the app also queues a `PUT /items/:id` for each line carrying the new
+**absolute** `stockQty`, so the item update already reflects the sale. Decrementing again
+on the bill create would double-count. (Same for `DELETE /bills/:id` — see below.)
 
 Discounts are applied per line item, not as a single bill-wide amount: each entry in
 `items` carries its own `discount` (a monetary amount, already converted from % if the
@@ -137,9 +149,10 @@ and the recalculated payment figures). A backend can treat that as an idempotent
 of the bill; the frontend already adjusts local stock by the qty delta before syncing.
 
 ### `DELETE /bills/:id`
-Response `204`. Exposed via the "Delete Bill" action on the bill detail page; deleting a
-bill restores the stock its line items had consumed. Also replayed by the sync engine if a
-delete was queued while offline.
+Response `204`. Exposed via the "Delete Bill" action on the bill detail page. Also replayed
+by the sync engine if a delete was queued while offline. As with create, **do not restore
+item stock here** — the app already queues `PUT /items/:id` updates with the restored
+absolute `stockQty` for each line, so restoring server-side too would double-count.
 
 ## Notes for the backend implementation
 

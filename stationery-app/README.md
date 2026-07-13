@@ -28,7 +28,7 @@ server is unreachable.
 
 ## Requirements
 
-- Node.js 18+ and npm
+- Node.js 20+ and npm (required by Angular 20)
 - Ionic CLI: `npm install -g @ionic/cli`
 - For Android builds: Android Studio / Android SDK, a JDK (21 is required by some
   Capacitor plugins — see Troubleshooting below), and an emulator or device
@@ -70,7 +70,9 @@ export const environment = {
 };
 ```
 
-See `API_CONTRACT.md` for the endpoints the app expects the backend to expose.
+See `API_CONTRACT.md` for the endpoints the app expects the backend to expose, and
+`BACKEND_PROMPT.md` for a full build-ready spec of the backend itself (Node.js + Express +
+Homebrew MySQL — schema, auth, business rules, and an acceptance checklist).
 
 > **Note:** QR/barcode scanning uses the device camera and only runs on the Android app.
 > On the web build, the scanner modal falls back to a "choose from gallery" image scan.
@@ -159,7 +161,8 @@ accounts can also be created from the **Sign Up** page (`/signup`), which create
 local account and signs you straight in — no server call involved.
 
 `POST /auth/login` is only called as a fallback when a username isn't found locally,
-so it will fail until you build a backend matching `API_CONTRACT.md`. Once one exists,
+so it will fail until you build a backend matching `API_CONTRACT.md` (see `BACKEND_PROMPT.md`
+for a ready-to-build spec). Once one exists,
 logging in with a username that isn't a local account will hit it transparently.
 Everything else in the app (browsing cached items, offline billing, etc.) is designed
 to keep working regardless of backend availability once a session exists.
