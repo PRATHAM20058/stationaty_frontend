@@ -11,7 +11,8 @@ Linux Lite is Ubuntu-LTS based, so everything below uses `apt`, `systemd`, and `
 >   network at `http://<server-ip>:3000`. Works only while the phone is on the same Wi-Fi.
 > - **Option B — Internet + HTTPS (DuckDNS + reverse proxy).** Reach it from anywhere over
 >   `https://<you>.duckdns.org`. More setup, but no cleartext/Mixed-Content issues and works
->   off your home network. See the last section.
+>   off your home network. See the last section — or the full step-by-step walkthrough in
+>   **[`DEPLOY_LINUX_OPTION_B_HTTPS.md`](./DEPLOY_LINUX_OPTION_B_HTTPS.md)**.
 >
 > Most home setups want **Option A**. The frontend changes differ per option — see
 > "Frontend changes" at the end.
