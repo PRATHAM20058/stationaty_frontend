@@ -17,18 +17,21 @@ function toMysqlDate(iso) {
   return valid.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-// Generate the next human-friendly bill number for this user: BILL-000001, BILL-000002, ...
-// Numbering is per-user, so each shop's bills start at 1.
+// Generate the next invoice number for this user: a plain, zero-padded 8-digit sequence
+// (00000001, 00000002, ...). Numbering is per-user, so each shop's bills start at 1.
+// Robust to legacy "BILL-00000x" rows: we take the largest numeric suffix across whatever
+// formats exist so the sequence keeps incrementing across the format change.
 async function nextBillNo(conn, userId) {
-  const [rows] = await conn.query(
-    "SELECT bill_no FROM bills WHERE user_id = ? AND bill_no REGEXP '^BILL-[0-9]+$' ORDER BY CAST(SUBSTRING(bill_no, 6) AS UNSIGNED) DESC LIMIT 1",
-    [userId]
-  );
-  let next = 1;
-  if (rows.length > 0) {
-    next = parseInt(rows[0].bill_no.slice(5), 10) + 1;
+  const [rows] = await conn.query('SELECT bill_no FROM bills WHERE user_id = ?', [userId]);
+  let max = 0;
+  for (const r of rows) {
+    const digits = String(r.bill_no || '').replace(/\D/g, '');
+    if (!digits) continue;
+    const n = parseInt(digits, 10);
+    // Guard against a stray oversized value (e.g. an old timestamp-based temp number).
+    if (Number.isFinite(n) && n < 100000000 && n > max) max = n;
   }
-  return 'BILL-' + String(next).padStart(6, '0');
+  return String(max + 1).padStart(8, '0');
 }
 
 // Load a full bill (row + nested items) as client JSON for this user, or null if missing/not theirs.

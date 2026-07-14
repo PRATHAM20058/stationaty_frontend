@@ -280,14 +280,16 @@ Bill JSON shape (returned by `GET /bills`, and the body of `POST /bills`):
 | `PUT /bills/:id/payment` | payment patch **or** full bill        | 200     | Dual-purpose — see below. |
 | `DELETE /bills/:id`      | –                                     | 204     | Delete the bill and its `bill_items` (FK cascade). |
 
-**`POST /bills` details.** The client sends the whole bill including a *temporary* local `id`
-(`local-...`) and a placeholder `billNo` (`BILL-<timestamp>`). Do **not** trust them:
+**`POST /bills` details.** The client sends the whole bill (including the additive GST fields)
+plus a *temporary* local `id` (`local-...`) and a placeholder `billNo` (`BILL-<timestamp>`).
+Do **not** trust the client id/billNo:
 - Generate a fresh UUID `id`.
-- Generate a real, human-friendly, unique `billNo` server-side (e.g. `BILL-000123` from a
-  counter/sequence, or keep the timestamp scheme — just make it unique).
+- Assign a per-user, sequential, plain **8-digit** `billNo` (`00000001`, `00000002`, …). The
+  reference implementation's `nextBillNo` takes the largest numeric suffix across the user's
+  existing `bill_no`s (robust to any legacy `BILL-00000x` rows) and zero-pads `+1` to 8 digits.
 - Insert the bill row and one `bill_items` row per `items[]` entry, inside a transaction.
-- Respond `201` with the complete stored bill (server `id`, server `billNo`, echoed items/totals).
-  The client replaces its local id/billNo with these.
+- Respond `201` with the complete stored bill (server `id`, server `billNo`, echoed items/totals
+  including the GST columns). The client replaces its local id/billNo with these on sync.
 
 **`PUT /bills/:id/payment` is dual-purpose.** The client's sync engine replays two different
 "update bill" cases through this one endpoint:

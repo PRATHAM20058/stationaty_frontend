@@ -12,6 +12,15 @@ function money(n: number | undefined | null): string {
   return (Number(n) || 0).toFixed(2);
 }
 
+/** Formats an ISO date string as DD/MM/YYYY for the invoice. */
+function formatDMY(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PdfService {
   constructor(private sellerConfig: SellerConfigService) {}
@@ -142,24 +151,27 @@ export class PdfService {
       pageSize: 'A4',
       pageMargins: [24, 24, 24, 24] as [number, number, number, number],
       content: [
-        // Top band
+        // Centered title band
+        { text: '|| Shree Ganeshay Namah ||', style: 'divine', alignment: 'center' },
+        { text: 'TAX INVOICE', style: 'invoiceTitle', alignment: 'center' },
+        { text: 'CASH · CREDIT MEMO', style: 'memoKind', alignment: 'center' },
+        // Top band: GSTIN/PAN left, centered business identity, mobiles right
         {
           table: {
             widths: [150, '*', 150],
             body: [
               [
-                { text: `GSTIN: ${seller.sellerGstin}\nPAN: ${seller.pan}`, style: 'bandSmall' },
+                { text: `GSTIN: ${seller.sellerGstin}\nPAN: ${seller.pan}`, style: 'bandSmall', border: border0 },
                 {
                   stack: [
-                    { text: '|| Shree Ganeshay Namah ||', style: 'divine' },
-                    { text: 'CASH · CREDIT MEMO', style: 'memoKind' },
                     { text: seller.businessName, style: 'bizName' },
                     { text: seller.subtitle, style: 'bizSub' },
                     { text: seller.address, style: 'bizSub' },
                   ],
                   alignment: 'center',
+                  border: border0,
                 },
-                { text: `TAX INVOICE\n\nMob: ${seller.mobiles.join(', ')}`, style: 'bandSmall', alignment: 'right' },
+                { text: `Mob: ${seller.mobiles.join('\n')}`, style: 'bandSmall', alignment: 'right', border: border0 },
               ],
             ],
           },
@@ -182,7 +194,7 @@ export class PdfService {
                 {
                   stack: [
                     { text: `Invoice No.: ${bill.billNo}`, style: 'metaValue' },
-                    { text: `Date: ${new Date(bill.date).toLocaleDateString()}`, style: 'metaValue' },
+                    { text: `Date: ${formatDMY(bill.date)}`, style: 'metaValue' },
                     { text: `State: ${seller.sellerState}   Code: ${seller.sellerStateCode}`, style: 'metaValue' },
                   ],
                 },
@@ -251,8 +263,9 @@ export class PdfService {
       ],
       styles: {
         bandSmall: { fontSize: 8 },
-        divine: { fontSize: 8, italics: true },
-        memoKind: { fontSize: 7, color: 'gray' },
+        divine: { fontSize: 9, italics: true },
+        invoiceTitle: { fontSize: 15, bold: true, margin: [0, 2, 0, 2] as [number, number, number, number] },
+        memoKind: { fontSize: 7, color: 'gray', margin: [0, 0, 0, 4] as [number, number, number, number] },
         bizName: { fontSize: 18, bold: true, margin: [0, 2, 0, 0] as [number, number, number, number] },
         bizSub: { fontSize: 8 },
         metaLabel: { fontSize: 8, color: 'gray' },

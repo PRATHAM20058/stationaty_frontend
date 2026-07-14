@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -68,6 +69,11 @@ export class BillDetailPage implements OnInit {
   editing = false;
   editItems: BillItem[] = [];
 
+  /** The id currently loaded — starts as the route id (may be a local temp id) and is swapped
+      for the server id once the bill's create syncs. */
+  private currentId: string | null = null;
+  private destroyRef = inject(DestroyRef);
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -82,14 +88,28 @@ export class BillDetailPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.load();
+    // If this bill was just created offline/pending, its temp id/number get replaced by the
+    // server's on sync -- reload so the real 8-digit invoice number shows without navigating away.
+    this.billingService.remapped$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(({ localId, serverId }) => {
+      if (this.currentId === localId) this.load(serverId);
+    });
   }
 
-  async load(): Promise<void> {
-    const id = this.route.snapshot.paramMap.get('id');
+  async load(explicitId?: string): Promise<void> {
+    const id = explicitId ?? this.currentId ?? this.route.snapshot.paramMap.get('id');
     this.loading = true;
-    if (id) {
-      this.bill = (await this.billingService.getBillById(id)) ?? null;
+    let resolvedId = id;
+    let bill = id ? (await this.billingService.getBillById(id)) ?? null : null;
+    // The row's local id may already have been remapped to the server id by a completed sync.
+    if (!bill && id) {
+      const remap = this.billingService.resolveSyncedId(id);
+      if (remap) {
+        resolvedId = remap.serverId;
+        bill = (await this.billingService.getBillById(remap.serverId)) ?? null;
+      }
     }
+    this.bill = bill;
+    this.currentId = resolvedId ?? null;
     this.loading = false;
   }
 

@@ -159,6 +159,11 @@ npm ci        # or: npm install
 npm run seed  # creates tables + seeds admin/admin123 (idempotent; also runs on boot)
 ```
 
+> `npm run seed` is idempotent and also applies **additive column migrations** on existing
+> databases (the multi-tenant `user_id` columns and all the GST columns on `items`/`bills`/
+> `bill_items`). So when you deploy a code update over an existing DB — `git pull && npm run
+> seed` — the new GST columns are added automatically, with no data loss and no manual SQL.
+
 Quick manual test before making it a service:
 ```bash
 npm start

@@ -143,10 +143,12 @@ should persist-and-echo whatever GST columns it stores and ignore any it doesn't
 contract stays backward compatible.
 
 ### `POST /bills`
-Request body: the full bill object. The app generates a temporary `billNo` and `id`
-locally (offline or not) and includes them, but the server should **ignore** them and
-assign its own; the server's response values replace them once synced.
-Response `201`: full bill including server-assigned `id` and `billNo`.
+Request body: the full bill object (including the additive GST fields above). The app
+generates a temporary `billNo` (`BILL-<timestamp>`) and `id` (`local-<ts>-<rand>`) locally
+(offline or not) and includes them, but the server should **ignore** them and assign its own;
+the server's response values replace them once synced.
+Response `201`: full bill including the server-assigned `id` and a plain, sequential
+**8-digit** `billNo` (`00000001`, `00000002`, … — per-user numbering).
 
 **Do not decrement item stock on this endpoint.** Stock is client-authoritative: when a
 bill is created the app also queues a `PUT /items/:id` for each line carrying the new

@@ -44,6 +44,19 @@ export class BillingService implements SyncableEntityService {
       reports) can live-refresh even while they're a backgrounded cached tab. */
   readonly changes$ = this._changes.asObservable();
 
+  /** Emits when a bill's create syncs and its local temp id/number are replaced by the
+      server-assigned id and 8-digit billNo. Lets an open bill-detail page swap in the real
+      invoice number instead of the offline placeholder. */
+  private readonly _remapped = new Subject<{ localId: string; serverId: string; billNo: string }>();
+  readonly remapped$ = this._remapped.asObservable();
+  /** Recent local->server id remaps, so a page that missed the live event (race) can still resolve. */
+  private readonly recentRemaps = new Map<string, { serverId: string; billNo: string }>();
+
+  /** Returns the server id/billNo a local temp bill id was remapped to on sync, if known. */
+  resolveSyncedId(localId: string): { serverId: string; billNo: string } | undefined {
+    return this.recentRemaps.get(localId);
+  }
+
   constructor(
     private http: HttpClient,
     private sqlite: SqliteService,
@@ -461,6 +474,9 @@ export class BillingService implements SyncableEntityService {
         { statement: `UPDATE bills SET id = ?, bill_no = ?, pending_sync = 0 WHERE id = ?`, values: [created.id, created.billNo, entityId] },
         { statement: `UPDATE bill_items SET bill_id = ? WHERE bill_id = ?`, values: [created.id, entityId] },
       ]);
+      // Notify any open bill-detail page so it can show the server's 8-digit invoice number.
+      this.recentRemaps.set(entityId, { serverId: created.id, billNo: created.billNo });
+      this._remapped.next({ localId: entityId, serverId: created.id, billNo: created.billNo });
     } else {
       await this.sqlite.run(`UPDATE bills SET pending_sync = 0 WHERE id = ?`, [entityId]);
     }

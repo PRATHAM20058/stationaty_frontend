@@ -295,7 +295,8 @@ export class BillingPage implements OnInit {
     return calcGstBill(
       {
         isGstInvoice: this.isGstInvoice,
-        buyerStateCode: this.buyerStateCode.trim() || null,
+        // Mirror generateBill's default so live totals match the saved bill (blank => intra-state).
+        buyerStateCode: this.buyerStateCode.trim() || '24',
         items: this.cart.map((l) => ({ subtotal: l.subtotal, discount: l.discount, gstPercent: l.gstPercent })),
       },
       this.seller,
@@ -357,8 +358,9 @@ export class BillingPage implements OnInit {
         chequeNo: this.paymentMethod === 'cheque' ? this.chequeNo.trim() || undefined : undefined,
         isGstInvoice: this.isGstInvoice,
         buyerGstin: this.isGstInvoice ? this.buyerGstin.trim() || null : null,
-        buyerState: this.isGstInvoice ? this.buyerState.trim() || null : null,
-        buyerStateCode: this.isGstInvoice ? this.buyerStateCode.trim() || null : null,
+        // Default a blank buyer state/code to the seller's own (Gujarat / 24) => intra-state.
+        buyerState: this.isGstInvoice ? this.buyerState.trim() || 'Gujarat' : null,
+        buyerStateCode: this.isGstInvoice ? this.buyerStateCode.trim() || '24' : null,
       });
 
       const toast = await this.toastController.create({ message: `Bill ${bill.billNo} generated`, duration: 1800, color: 'success' });

@@ -305,7 +305,8 @@ journalctl -u caddy -f
 systemctl status duckdns.timer
 journalctl -u duckdns.service -n 20
 
-# code update
+# code update (npm run seed is idempotent and applies additive schema migrations,
+# incl. the GST columns on items/bills/bill_items, to the existing DB — no data loss)
 cd ~/backend && git pull && npm ci && npm run seed && sudo systemctl restart backend
 
 # db backup

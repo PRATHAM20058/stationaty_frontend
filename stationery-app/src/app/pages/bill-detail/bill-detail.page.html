@@ -31,7 +31,7 @@
     <div class="bill-head">
       <div>
         <h1>{{ bill.billNo }}</h1>
-        <p>{{ bill.date | date: 'medium' }}</p>
+        <p>{{ bill.date | date: 'dd/MM/yyyy' }}</p>
       </div>
       @if (bill.paymentStatus === 'paid') {
         <ion-badge color="success">PAID</ion-badge>
