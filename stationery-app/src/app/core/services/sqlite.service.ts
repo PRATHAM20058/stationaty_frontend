@@ -28,6 +28,8 @@ const SCHEMA = `
     unit TEXT NOT NULL DEFAULT 'pcs',
     sku TEXT,
     godown_location TEXT,
+    hsn_code TEXT,
+    gst_percent REAL,
     pending_sync INTEGER DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS bills (
@@ -44,6 +46,19 @@ const SCHEMA = `
     amount_due REAL NOT NULL DEFAULT 0,
     payment_method TEXT,
     cheque_no TEXT,
+    is_gst_invoice INTEGER DEFAULT 0,
+    gst_type TEXT DEFAULT 'none',
+    seller_gstin TEXT,
+    seller_state_code TEXT,
+    buyer_gstin TEXT,
+    buyer_state TEXT,
+    buyer_state_code TEXT,
+    taxable_amount REAL DEFAULT 0,
+    sgst_total REAL DEFAULT 0,
+    cgst_total REAL DEFAULT 0,
+    igst_total REAL DEFAULT 0,
+    round_off REAL DEFAULT 0,
+    amount_in_words TEXT,
     pending_sync INTEGER DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS bill_items (
@@ -54,7 +69,13 @@ const SCHEMA = `
     qty REAL,
     price REAL,
     subtotal REAL,
-    discount REAL NOT NULL DEFAULT 0
+    discount REAL NOT NULL DEFAULT 0,
+    hsn_code TEXT,
+    gst_percent REAL DEFAULT 0,
+    taxable_value REAL,
+    sgst REAL DEFAULT 0,
+    cgst REAL DEFAULT 0,
+    igst REAL DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS sync_queue (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,16 +138,41 @@ export class SqliteService {
 
   /** Adds columns introduced after the initial CREATE TABLE for installs that already have the old schema. */
   private async migrate(): Promise<void> {
-    const billItemsInfo = await this.db.query(`PRAGMA table_info(bill_items)`);
-    const hasDiscountColumn = (billItemsInfo.values ?? []).some((col: any) => col.name === 'discount');
-    if (!hasDiscountColumn) {
-      await this.db.execute(`ALTER TABLE bill_items ADD COLUMN discount REAL NOT NULL DEFAULT 0`);
-    }
+    await this.addColumnIfMissing('bill_items', 'discount', 'REAL NOT NULL DEFAULT 0');
+    await this.addColumnIfMissing('bills', 'cheque_no', 'TEXT');
 
-    const billsInfo = await this.db.query(`PRAGMA table_info(bills)`);
-    const hasChequeNoColumn = (billsInfo.values ?? []).some((col: any) => col.name === 'cheque_no');
-    if (!hasChequeNoColumn) {
-      await this.db.execute(`ALTER TABLE bills ADD COLUMN cheque_no TEXT`);
+    // GST additions (all nullable / defaulted so legacy rows load unchanged).
+    await this.addColumnIfMissing('items', 'hsn_code', 'TEXT');
+    await this.addColumnIfMissing('items', 'gst_percent', 'REAL');
+
+    await this.addColumnIfMissing('bill_items', 'hsn_code', 'TEXT');
+    await this.addColumnIfMissing('bill_items', 'gst_percent', 'REAL DEFAULT 0');
+    await this.addColumnIfMissing('bill_items', 'taxable_value', 'REAL');
+    await this.addColumnIfMissing('bill_items', 'sgst', 'REAL DEFAULT 0');
+    await this.addColumnIfMissing('bill_items', 'cgst', 'REAL DEFAULT 0');
+    await this.addColumnIfMissing('bill_items', 'igst', 'REAL DEFAULT 0');
+
+    await this.addColumnIfMissing('bills', 'is_gst_invoice', 'INTEGER DEFAULT 0');
+    await this.addColumnIfMissing('bills', 'gst_type', `TEXT DEFAULT 'none'`);
+    await this.addColumnIfMissing('bills', 'seller_gstin', 'TEXT');
+    await this.addColumnIfMissing('bills', 'seller_state_code', 'TEXT');
+    await this.addColumnIfMissing('bills', 'buyer_gstin', 'TEXT');
+    await this.addColumnIfMissing('bills', 'buyer_state', 'TEXT');
+    await this.addColumnIfMissing('bills', 'buyer_state_code', 'TEXT');
+    await this.addColumnIfMissing('bills', 'taxable_amount', 'REAL DEFAULT 0');
+    await this.addColumnIfMissing('bills', 'sgst_total', 'REAL DEFAULT 0');
+    await this.addColumnIfMissing('bills', 'cgst_total', 'REAL DEFAULT 0');
+    await this.addColumnIfMissing('bills', 'igst_total', 'REAL DEFAULT 0');
+    await this.addColumnIfMissing('bills', 'round_off', 'REAL DEFAULT 0');
+    await this.addColumnIfMissing('bills', 'amount_in_words', 'TEXT');
+  }
+
+  /** Idempotently adds a column to a table, checking PRAGMA table_info first (no "IF NOT EXISTS" in SQLite ALTER). */
+  private async addColumnIfMissing(table: string, column: string, definition: string): Promise<void> {
+    const info = await this.db.query(`PRAGMA table_info(${table})`);
+    const exists = (info.values ?? []).some((col: any) => col.name === column);
+    if (!exists) {
+      await this.db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
     }
   }
 

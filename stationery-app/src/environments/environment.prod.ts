@@ -5,6 +5,6 @@ export const environment = {
   // Your company details, printed on every bill / invoice.
   company: {
     name: 'Shree Sales Agency',
-    gstNo: '24AABCS1234K1Z9',
+    gstNo: '24AIVPR6534P1Z8',
   },
 };

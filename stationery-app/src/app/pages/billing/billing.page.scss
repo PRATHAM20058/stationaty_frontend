@@ -168,3 +168,18 @@
   font-size: 1.1rem;
   margin-bottom: 24px;
 }
+
+.gst-line-editor {
+  --background: var(--ion-color-step-50);
+
+  ion-input {
+    max-width: 55%;
+  }
+}
+
+.amount-words {
+  margin-top: 10px;
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--ion-color-step-600);
+}

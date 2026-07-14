@@ -8,10 +8,12 @@ export const environment = {
   // For browser dev (ionic serve / ng serve) change this back to http://localhost:3000/api.
   apiUrl: 'http://10.0.2.2:3000/api',
   lowStockThreshold: 5,
-  // Your company details, printed on every bill / invoice.
+  // Your company details, printed on every bill / invoice. The full GST seller profile
+  // (address, state code, bank, etc.) is editable in Settings and stored via SellerConfigService;
+  // these are the fallback seed values.
   company: {
     name: 'Shree Sales Agency',
-    gstNo: '24AABCS1234K1Z9',
+    gstNo: '24AIVPR6534P1Z8',
   },
 };
 

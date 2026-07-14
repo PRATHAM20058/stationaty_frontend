@@ -31,6 +31,8 @@ function itemToJson(row) {
     unit: row.unit,
     sku: row.sku,
     godownLocation: row.godown_location,
+    hsnCode: row.hsn_code ?? null,
+    gstPercent: row.gst_percent === null || row.gst_percent === undefined ? null : num(row.gst_percent),
   };
 }
 
@@ -43,6 +45,12 @@ function billItemToJson(row) {
     price: num(row.price),
     subtotal: num(row.subtotal),
     discount: num(row.discount),
+    hsnCode: row.hsn_code ?? null,
+    gstPercent: num(row.gst_percent),
+    taxableValue: row.taxable_value === null || row.taxable_value === undefined ? undefined : num(row.taxable_value),
+    sgst: num(row.sgst),
+    cgst: num(row.cgst),
+    igst: num(row.igst),
   };
 }
 
@@ -63,6 +71,19 @@ function billToJson(billRow, itemRows) {
     amountDue: num(billRow.amount_due),
     paymentMethod: billRow.payment_method,
     chequeNo: billRow.cheque_no === null ? undefined : billRow.cheque_no,
+    isGstInvoice: !!billRow.is_gst_invoice,
+    gstType: billRow.gst_type ?? 'none',
+    sellerGstin: billRow.seller_gstin ?? undefined,
+    sellerStateCode: billRow.seller_state_code ?? undefined,
+    buyerGstin: billRow.buyer_gstin ?? null,
+    buyerState: billRow.buyer_state ?? null,
+    buyerStateCode: billRow.buyer_state_code ?? null,
+    taxableAmount: num(billRow.taxable_amount),
+    sgstTotal: num(billRow.sgst_total),
+    cgstTotal: num(billRow.cgst_total),
+    igstTotal: num(billRow.igst_total),
+    roundOff: num(billRow.round_off),
+    amountInWords: billRow.amount_in_words ?? undefined,
   };
 }
 

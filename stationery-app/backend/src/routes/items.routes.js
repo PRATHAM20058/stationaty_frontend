@@ -22,6 +22,8 @@ function readItemBody(body) {
     unit: b.unit || 'pcs',
     sku: b.sku ?? null,
     godownLocation: b.godownLocation ?? null,
+    hsnCode: b.hsnCode ?? null,
+    gstPercent: b.gstPercent === null || b.gstPercent === undefined || b.gstPercent === '' ? null : Number(b.gstPercent),
   };
 }
 
@@ -61,10 +63,11 @@ router.post('/', async (req, res, next) => {
     const categoryId = await ownedCategoryId(fields.categoryId, req.user.id);
     await query(
       `INSERT INTO items
-         (id, name, category_id, category, purchase_price, selling_price, stock_qty, unit, sku, godown_location, user_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, name, category_id, category, purchase_price, selling_price, stock_qty, unit, sku, godown_location, hsn_code, gst_percent, user_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, fields.name, categoryId, fields.category, fields.purchasePrice,
-       fields.sellingPrice, fields.stockQty, fields.unit, fields.sku, fields.godownLocation, req.user.id]
+       fields.sellingPrice, fields.stockQty, fields.unit, fields.sku, fields.godownLocation,
+       fields.hsnCode, fields.gstPercent, req.user.id]
     );
     const rows = await query('SELECT * FROM items WHERE id = ?', [id]);
     res.status(201).json(itemToJson(rows[0]));
@@ -85,10 +88,11 @@ router.put('/:id', async (req, res, next) => {
     const result = await query(
       `UPDATE items SET
          name = ?, category_id = ?, category = ?, purchase_price = ?, selling_price = ?,
-         stock_qty = ?, unit = ?, sku = ?, godown_location = ?
+         stock_qty = ?, unit = ?, sku = ?, godown_location = ?, hsn_code = ?, gst_percent = ?
        WHERE id = ? AND user_id = ?`,
       [fields.name, categoryId, fields.category, fields.purchasePrice, fields.sellingPrice,
-       fields.stockQty, fields.unit, fields.sku, fields.godownLocation, req.params.id, req.user.id]
+       fields.stockQty, fields.unit, fields.sku, fields.godownLocation, fields.hsnCode, fields.gstPercent,
+       req.params.id, req.user.id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ message: 'Item not found' });
     const rows = await query('SELECT * FROM items WHERE id = ?', [req.params.id]);

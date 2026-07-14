@@ -72,17 +72,23 @@ Returns all items (frontend does search/filter/low-stock locally against its cac
   "stockQty": 0,
   "unit": "pcs | box | dozen | pack",
   "sku": "string | null",
-  "godownLocation": "string | null"
+  "godownLocation": "string | null",
+  "hsnCode": "string | null",
+  "gstPercent": "number | null  // one of 0, 5, 12, 18, 28"
 }]
 ```
 
+`hsnCode` and `gstPercent` are **optional, additive** GST fields (nullable, default `NULL`).
+Legacy items without them behave exactly as before.
+
 ### `POST /items`
-Request body: item fields minus `id`.
+Request body: item fields minus `id` (now including the optional `hsnCode` / `gstPercent`).
 Response `201`: full item including server-assigned `id`.
 
 ### `PUT /items/:id`
 Request body: item fields minus `id` (full replace, including `stockQty` — the app
-sends the item's new absolute stock quantity after billing reduces it, not a delta).
+sends the item's new absolute stock quantity after billing reduces it, not a delta — and
+the optional `hsnCode` / `gstPercent`).
 Response `200`.
 
 ### `DELETE /items/:id`
@@ -99,7 +105,10 @@ Returns all bills (frontend filters by date/status/customer locally).
   "customerName": "string",
   "customerPhone": "string | null",
   "date": "ISO 8601 string",
-  "items": [{ "itemId": "string", "itemName": "string", "qty": 0, "price": 0, "subtotal": 0, "discount": 0 }],
+  "items": [{
+    "itemId": "string", "itemName": "string", "qty": 0, "price": 0, "subtotal": 0, "discount": 0,
+    "hsnCode": "string | null", "gstPercent": 0, "taxableValue": 0, "sgst": 0, "cgst": 0, "igst": 0
+  }],
   "discount": 0,
   "total": 0,
   "grandTotal": 0,
@@ -107,9 +116,31 @@ Returns all bills (frontend filters by date/status/customer locally).
   "amountPaid": 0,
   "amountDue": 0,
   "paymentMethod": "cash | upi | cheque | null",
-  "chequeNo": "string | undefined (only meaningful when paymentMethod is 'cheque'; optional, may be added after the bill is created)"
+  "chequeNo": "string | undefined (only meaningful when paymentMethod is 'cheque'; optional, may be added after the bill is created)",
+
+  "isGstInvoice": false,
+  "gstType": "intra | inter | none",
+  "sellerGstin": "string | undefined",
+  "sellerStateCode": "string | undefined",
+  "buyerGstin": "string | null",
+  "buyerState": "string | null",
+  "buyerStateCode": "string | null",
+  "taxableAmount": 0,
+  "sgstTotal": 0,
+  "cgstTotal": 0,
+  "igstTotal": 0,
+  "roundOff": 0,
+  "amountInWords": "string | undefined"
 }]
 ```
+
+All the GST fields above (line-level and bill-level) are **optional and additive**
+(nullable / defaulted to `0` / `false` / `"none"`). For a non-GST bill every tax and
+`roundOff` is `0`, `gstType` is `"none"`, and `grandTotal` still equals `total - discount`.
+When `isGstInvoice` is true, `grandTotal = taxableAmount + sgstTotal + cgstTotal + igstTotal
++ roundOff` (rounded to the nearest rupee, the difference captured in `roundOff`). The server
+should persist-and-echo whatever GST columns it stores and ignore any it doesn't yet — the
+contract stays backward compatible.
 
 ### `POST /bills`
 Request body: the full bill object. The app generates a temporary `billNo` and `id`
@@ -145,8 +176,9 @@ Response `200`.
 
 Editing a bill's line items (via "Edit Items" on the bill detail page) is also replayed
 as an `update` action on this endpoint, sending the full recomputed bill (items, totals,
-and the recalculated payment figures). A backend can treat that as an idempotent upsert
-of the bill; the frontend already adjusts local stock by the qty delta before syncing.
+the recalculated payment figures, and the recomputed GST fields). A backend can treat that
+as an idempotent upsert of the bill; the frontend already adjusts local stock by the qty
+delta before syncing.
 
 ### `DELETE /bills/:id`
 Response `204`. Exposed via the "Delete Bill" action on the bill detail page. Also replayed

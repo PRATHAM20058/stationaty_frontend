@@ -7,6 +7,8 @@ import { SqliteService } from './sqlite.service';
 import { SyncTriggerService } from './sync-trigger.service';
 import { SyncableEntityService, generateLocalId } from './syncable';
 import { ItemService } from './item.service';
+import { SellerConfigService } from './seller-config.service';
+import { calcGstBill } from '../utils/gst.util';
 
 export interface NewBillInput {
   customerName: string;
@@ -18,6 +20,11 @@ export interface NewBillInput {
   amountDue: number;
   paymentMethod?: PaymentMethod;
   chequeNo?: string;
+  // --- GST (optional; when isGstInvoice is falsy the bill behaves exactly as before) ---
+  isGstInvoice?: boolean;
+  buyerGstin?: string | null;
+  buyerState?: string | null;
+  buyerStateCode?: string | null;
 }
 
 export interface BillFilter {
@@ -42,6 +49,7 @@ export class BillingService implements SyncableEntityService {
     private sqlite: SqliteService,
     private syncTrigger: SyncTriggerService,
     private itemService: ItemService,
+    private sellerConfig: SellerConfigService,
   ) {}
 
   async createBill(input: NewBillInput): Promise<Bill> {
@@ -49,9 +57,8 @@ export class BillingService implements SyncableEntityService {
     const billNo = `BILL-${Date.now()}`;
     const date = new Date().toISOString();
     const total = input.items.reduce((sum, it) => sum + it.subtotal, 0);
-    const grandTotal = Math.max(0, total - input.discount);
 
-    const bill: Bill = {
+    const base: Bill = {
       id,
       billNo,
       customerName: input.customerName,
@@ -60,13 +67,20 @@ export class BillingService implements SyncableEntityService {
       items: input.items,
       discount: input.discount,
       total,
-      grandTotal,
+      grandTotal: Math.max(0, total - input.discount),
       paymentStatus: input.paymentStatus,
       amountPaid: input.amountPaid,
       amountDue: input.amountDue,
       paymentMethod: input.paymentMethod ?? null,
       chequeNo: input.chequeNo,
     };
+
+    const bill = await this.enrichWithGst(base, {
+      isGstInvoice: input.isGstInvoice,
+      buyerGstin: input.buyerGstin,
+      buyerState: input.buyerState,
+      buyerStateCode: input.buyerStateCode,
+    });
 
     await this.insertLocal(bill, true);
 
@@ -78,6 +92,70 @@ export class BillingService implements SyncableEntityService {
     await this.enqueue('create', id, bill);
     this.syncTrigger.requestSync();
     return bill;
+  }
+
+  /**
+   * Populates the GST fields of a bill from the current seller config. For a non-GST bill it
+   * zeroes the tax fields and leaves grandTotal at total - discount, so the result is identical
+   * to the legacy shape. For a GST invoice it computes per-line and bill-level tax via
+   * calcGstBill and overrides grandTotal with the tax-inclusive, rounded value.
+   */
+  private async enrichWithGst(
+    bill: Bill,
+    gst: { isGstInvoice?: boolean; buyerGstin?: string | null; buyerState?: string | null; buyerStateCode?: string | null },
+  ): Promise<Bill> {
+    if (!gst.isGstInvoice) {
+      return {
+        ...bill,
+        isGstInvoice: false,
+        gstType: 'none',
+        taxableAmount: bill.grandTotal,
+        sgstTotal: 0,
+        cgstTotal: 0,
+        igstTotal: 0,
+        roundOff: 0,
+        items: bill.items.map((line) => ({
+          ...line,
+          gstPercent: 0,
+          taxableValue: line.subtotal - line.discount,
+          sgst: 0,
+          cgst: 0,
+          igst: 0,
+        })),
+      };
+    }
+
+    const seller = await this.sellerConfig.get();
+    const result = calcGstBill(
+      { isGstInvoice: true, buyerStateCode: gst.buyerStateCode, items: bill.items },
+      seller,
+    );
+
+    return {
+      ...bill,
+      items: bill.items.map((line, i) => ({
+        ...line,
+        gstPercent: result.lines[i].gstPercent,
+        taxableValue: result.lines[i].taxableValue,
+        sgst: result.lines[i].sgst,
+        cgst: result.lines[i].cgst,
+        igst: result.lines[i].igst,
+      })),
+      grandTotal: result.grandTotal,
+      isGstInvoice: true,
+      gstType: result.gstType,
+      sellerGstin: seller.sellerGstin,
+      sellerStateCode: seller.sellerStateCode,
+      buyerGstin: gst.buyerGstin ?? null,
+      buyerState: gst.buyerState ?? null,
+      buyerStateCode: gst.buyerStateCode ?? null,
+      taxableAmount: result.taxableAmount,
+      sgstTotal: result.sgstTotal,
+      cgstTotal: result.cgstTotal,
+      igstTotal: result.igstTotal,
+      roundOff: result.roundOff,
+      amountInWords: result.amountInWords,
+    };
   }
 
   /** Deletes a bill and puts the quantities its lines had consumed back into stock. */
@@ -112,7 +190,18 @@ export class BillingService implements SyncableEntityService {
 
     const total = items.reduce((sum, it) => sum + it.subtotal, 0);
     const discount = items.reduce((sum, it) => sum + it.discount, 0);
-    const grandTotal = Math.max(0, total - discount);
+
+    // Recompute GST (if any) first so the grand total the payment figures key off is tax-inclusive.
+    const enriched = await this.enrichWithGst(
+      { ...existing, items, total, discount, grandTotal: Math.max(0, total - discount) },
+      {
+        isGstInvoice: existing.isGstInvoice,
+        buyerGstin: existing.buyerGstin,
+        buyerState: existing.buyerState,
+        buyerStateCode: existing.buyerStateCode,
+      },
+    );
+    const grandTotal = enriched.grandTotal;
 
     // Keep the payment figures consistent with the new grand total.
     let amountPaid: number;
@@ -123,11 +212,7 @@ export class BillingService implements SyncableEntityService {
     const paymentStatus: PaymentStatus = amountDue <= 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'pending';
 
     const updated: Bill = {
-      ...existing,
-      items,
-      total,
-      discount,
-      grandTotal,
+      ...enriched,
       amountPaid,
       amountDue,
       paymentStatus,
@@ -292,13 +377,19 @@ export class BillingService implements SyncableEntityService {
   private async insertLocal(bill: Bill, pendingSync: boolean): Promise<void> {
     await this.sqlite.runBatch([
       {
-        statement: `INSERT INTO bills (id, bill_no, customer_name, customer_phone, date, discount, total, grand_total, payment_status, amount_paid, amount_due, payment_method, cheque_no, pending_sync)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        statement: `INSERT INTO bills (id, bill_no, customer_name, customer_phone, date, discount, total, grand_total, payment_status, amount_paid, amount_due, payment_method, cheque_no,
+            is_gst_invoice, gst_type, seller_gstin, seller_state_code, buyer_gstin, buyer_state, buyer_state_code, taxable_amount, sgst_total, cgst_total, igst_total, round_off, amount_in_words, pending_sync)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             bill_no = excluded.bill_no, customer_name = excluded.customer_name, customer_phone = excluded.customer_phone,
             date = excluded.date, discount = excluded.discount, total = excluded.total, grand_total = excluded.grand_total,
             payment_status = excluded.payment_status, amount_paid = excluded.amount_paid, amount_due = excluded.amount_due,
-            payment_method = excluded.payment_method, cheque_no = excluded.cheque_no, pending_sync = excluded.pending_sync`,
+            payment_method = excluded.payment_method, cheque_no = excluded.cheque_no,
+            is_gst_invoice = excluded.is_gst_invoice, gst_type = excluded.gst_type, seller_gstin = excluded.seller_gstin,
+            seller_state_code = excluded.seller_state_code, buyer_gstin = excluded.buyer_gstin, buyer_state = excluded.buyer_state,
+            buyer_state_code = excluded.buyer_state_code, taxable_amount = excluded.taxable_amount, sgst_total = excluded.sgst_total,
+            cgst_total = excluded.cgst_total, igst_total = excluded.igst_total, round_off = excluded.round_off,
+            amount_in_words = excluded.amount_in_words, pending_sync = excluded.pending_sync`,
         values: [
           bill.id,
           bill.billNo,
@@ -313,13 +404,41 @@ export class BillingService implements SyncableEntityService {
           bill.amountDue,
           bill.paymentMethod ?? null,
           bill.chequeNo ?? null,
+          bill.isGstInvoice ? 1 : 0,
+          bill.gstType ?? 'none',
+          bill.sellerGstin ?? null,
+          bill.sellerStateCode ?? null,
+          bill.buyerGstin ?? null,
+          bill.buyerState ?? null,
+          bill.buyerStateCode ?? null,
+          bill.taxableAmount ?? 0,
+          bill.sgstTotal ?? 0,
+          bill.cgstTotal ?? 0,
+          bill.igstTotal ?? 0,
+          bill.roundOff ?? 0,
+          bill.amountInWords ?? null,
           pendingSync ? 1 : 0,
         ],
       },
       { statement: `DELETE FROM bill_items WHERE bill_id = ?`, values: [bill.id] },
       ...bill.items.map((line) => ({
-        statement: `INSERT INTO bill_items (bill_id, item_id, item_name, qty, price, subtotal, discount) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        values: [bill.id, line.itemId, line.itemName, line.qty, line.price, line.subtotal, line.discount ?? 0],
+        statement: `INSERT INTO bill_items (bill_id, item_id, item_name, qty, price, subtotal, discount, hsn_code, gst_percent, taxable_value, sgst, cgst, igst)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        values: [
+          bill.id,
+          line.itemId,
+          line.itemName,
+          line.qty,
+          line.price,
+          line.subtotal,
+          line.discount ?? 0,
+          line.hsnCode ?? null,
+          line.gstPercent ?? 0,
+          line.taxableValue ?? line.subtotal - (line.discount ?? 0),
+          line.sgst ?? 0,
+          line.cgst ?? 0,
+          line.igst ?? 0,
+        ],
       })),
     ]);
   }
@@ -372,6 +491,19 @@ export class BillingService implements SyncableEntityService {
       amountDue: billRow.amount_due,
       paymentMethod: billRow.payment_method ?? null,
       chequeNo: billRow.cheque_no ?? undefined,
+      isGstInvoice: !!billRow.is_gst_invoice,
+      gstType: billRow.gst_type ?? 'none',
+      sellerGstin: billRow.seller_gstin ?? undefined,
+      sellerStateCode: billRow.seller_state_code ?? undefined,
+      buyerGstin: billRow.buyer_gstin ?? null,
+      buyerState: billRow.buyer_state ?? null,
+      buyerStateCode: billRow.buyer_state_code ?? null,
+      taxableAmount: billRow.taxable_amount ?? 0,
+      sgstTotal: billRow.sgst_total ?? 0,
+      cgstTotal: billRow.cgst_total ?? 0,
+      igstTotal: billRow.igst_total ?? 0,
+      roundOff: billRow.round_off ?? 0,
+      amountInWords: billRow.amount_in_words ?? undefined,
       pendingSync: !!billRow.pending_sync,
       items: itemRows.map((ir) => ({
         itemId: ir.item_id,
@@ -380,6 +512,12 @@ export class BillingService implements SyncableEntityService {
         price: ir.price,
         subtotal: ir.subtotal,
         discount: ir.discount ?? 0,
+        hsnCode: ir.hsn_code ?? null,
+        gstPercent: ir.gst_percent ?? 0,
+        taxableValue: ir.taxable_value ?? undefined,
+        sgst: ir.sgst ?? 0,
+        cgst: ir.cgst ?? 0,
+        igst: ir.igst ?? 0,
       })),
     };
   }

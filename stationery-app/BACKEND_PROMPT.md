@@ -124,37 +124,65 @@ CREATE TABLE IF NOT EXISTS items (
   unit            VARCHAR(16)   NOT NULL DEFAULT 'pcs',  -- pcs | box | dozen | pack
   sku             VARCHAR(80)   NULL,
   godown_location VARCHAR(160)  NULL,
+  hsn_code        VARCHAR(20)   NULL,           -- GST: HSN/SAC code (additive, nullable)
+  gst_percent     DECIMAL(5,2)  NULL,           -- GST: rate 0/5/12/18/28 (additive, nullable)
   CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS bills (
-  id             CHAR(36)      NOT NULL PRIMARY KEY,
-  bill_no        VARCHAR(40)   NOT NULL,
-  customer_name  VARCHAR(160)  NOT NULL,
-  customer_phone VARCHAR(40)   NULL,
-  date           DATETIME      NOT NULL,        -- store the client's ISO-8601 instant (UTC)
-  discount       DECIMAL(10,2) NOT NULL DEFAULT 0,   -- sum of per-line discounts
-  total          DECIMAL(10,2) NOT NULL DEFAULT 0,   -- sum of line gross subtotals
-  grand_total    DECIMAL(10,2) NOT NULL DEFAULT 0,   -- total - discount
-  payment_status VARCHAR(16)   NOT NULL DEFAULT 'paid', -- paid | pending | partial
-  amount_paid    DECIMAL(10,2) NOT NULL DEFAULT 0,
-  amount_due     DECIMAL(10,2) NOT NULL DEFAULT 0,
-  payment_method VARCHAR(16)   NULL,            -- cash | upi | cheque | null
-  cheque_no      VARCHAR(60)   NULL
+  id                CHAR(36)      NOT NULL PRIMARY KEY,
+  bill_no           VARCHAR(40)   NOT NULL,
+  customer_name     VARCHAR(160)  NOT NULL,
+  customer_phone    VARCHAR(40)   NULL,
+  date              DATETIME      NOT NULL,        -- store the client's ISO-8601 instant (UTC)
+  discount          DECIMAL(10,2) NOT NULL DEFAULT 0,   -- sum of per-line discounts
+  total             DECIMAL(10,2) NOT NULL DEFAULT 0,   -- sum of line gross subtotals
+  grand_total       DECIMAL(10,2) NOT NULL DEFAULT 0,   -- non-GST: total - discount; GST: taxable + taxes + round_off
+  payment_status    VARCHAR(16)   NOT NULL DEFAULT 'paid', -- paid | pending | partial
+  amount_paid       DECIMAL(10,2) NOT NULL DEFAULT 0,
+  amount_due        DECIMAL(10,2) NOT NULL DEFAULT 0,
+  payment_method    VARCHAR(16)   NULL,            -- cash | upi | cheque | null
+  cheque_no         VARCHAR(60)   NULL,
+  -- GST fields (all additive; a non-GST bill leaves these at their defaults)
+  is_gst_invoice    TINYINT(1)    NOT NULL DEFAULT 0,
+  gst_type          VARCHAR(10)   NOT NULL DEFAULT 'none',  -- intra | inter | none
+  seller_gstin      VARCHAR(20)   NULL,
+  seller_state_code VARCHAR(4)    NULL,
+  buyer_gstin       VARCHAR(20)   NULL,
+  buyer_state       VARCHAR(60)   NULL,
+  buyer_state_code  VARCHAR(4)    NULL,
+  taxable_amount    DECIMAL(10,2) NOT NULL DEFAULT 0,   -- = total - discount
+  sgst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+  cgst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+  igst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+  round_off         DECIMAL(10,2) NOT NULL DEFAULT 0,   -- signed rounding to whole rupee
+  amount_in_words   VARCHAR(255)  NULL
 );
 
 CREATE TABLE IF NOT EXISTS bill_items (
-  id        BIGINT AUTO_INCREMENT PRIMARY KEY,
-  bill_id   CHAR(36)      NOT NULL,
-  item_id   CHAR(36)      NULL,                 -- may be null if the item was later deleted
-  item_name VARCHAR(160)  NOT NULL,             -- snapshot of the name at sale time
-  qty       DECIMAL(10,2) NOT NULL,
-  price     DECIMAL(10,2) NOT NULL,
-  subtotal  DECIMAL(10,2) NOT NULL,             -- qty * price (gross, before discount)
-  discount  DECIMAL(10,2) NOT NULL DEFAULT 0,   -- per-line discount amount
+  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+  bill_id       CHAR(36)      NOT NULL,
+  item_id       CHAR(36)      NULL,                 -- may be null if the item was later deleted
+  item_name     VARCHAR(160)  NOT NULL,             -- snapshot of the name at sale time
+  qty           DECIMAL(10,2) NOT NULL,
+  price         DECIMAL(10,2) NOT NULL,
+  subtotal      DECIMAL(10,2) NOT NULL,             -- qty * price (gross, before discount)
+  discount      DECIMAL(10,2) NOT NULL DEFAULT 0,   -- per-line discount amount
+  -- GST fields (additive; 0/null on non-GST lines)
+  hsn_code      VARCHAR(20)   NULL,
+  gst_percent   DECIMAL(5,2)  NOT NULL DEFAULT 0,
+  taxable_value DECIMAL(10,2) NULL,                 -- = subtotal - discount
+  sgst          DECIMAL(10,2) NOT NULL DEFAULT 0,
+  cgst          DECIMAL(10,2) NOT NULL DEFAULT 0,
+  igst          DECIMAL(10,2) NOT NULL DEFAULT 0,
   CONSTRAINT fk_bill_items_bill FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
 );
 ```
+
+> **GST fields are additive & backward compatible.** All columns above added for GST are
+> nullable or defaulted, so existing rows and non-GST bills are unaffected. `grandTotal` for a
+> non-GST bill still equals `total - discount`. The frontend computes all tax values; the server
+> persists-and-echoes them (cast DECIMALs with `Number()`), and may ignore any it doesn't store.
 
 Notes:
 - **IDs are opaque strings.** Use `CHAR(36)` UUIDs (e.g. `crypto.randomUUID()`), generated by the

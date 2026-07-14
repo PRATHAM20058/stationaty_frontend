@@ -43,8 +43,8 @@ async function loadBill(id, userId) {
 async function insertBillItems(conn, billId, items) {
   for (const line of items || []) {
     await conn.query(
-      `INSERT INTO bill_items (bill_id, item_id, item_name, qty, price, subtotal, discount)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO bill_items (bill_id, item_id, item_name, qty, price, subtotal, discount, hsn_code, gst_percent, taxable_value, sgst, cgst, igst)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         billId,
         line.itemId ?? null,
@@ -53,6 +53,12 @@ async function insertBillItems(conn, billId, items) {
         Number(line.price) || 0,
         Number(line.subtotal) || 0,
         Number(line.discount) || 0,
+        line.hsnCode ?? null,
+        Number(line.gstPercent) || 0,
+        line.taxableValue === null || line.taxableValue === undefined ? null : Number(line.taxableValue),
+        Number(line.sgst) || 0,
+        Number(line.cgst) || 0,
+        Number(line.igst) || 0,
       ]
     );
   }
@@ -102,8 +108,10 @@ router.post('/', async (req, res, next) => {
     await conn.query(
       `INSERT INTO bills
          (id, bill_no, customer_name, customer_phone, date, discount, total, grand_total,
-          payment_status, amount_paid, amount_due, payment_method, cheque_no, user_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          payment_status, amount_paid, amount_due, payment_method, cheque_no,
+          is_gst_invoice, gst_type, seller_gstin, seller_state_code, buyer_gstin, buyer_state, buyer_state_code,
+          taxable_amount, sgst_total, cgst_total, igst_total, round_off, amount_in_words, user_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         billNo,
@@ -118,6 +126,19 @@ router.post('/', async (req, res, next) => {
         Number(body.amountDue) || 0,
         body.paymentMethod ?? null,
         body.chequeNo ?? null,
+        body.isGstInvoice ? 1 : 0,
+        body.gstType || 'none',
+        body.sellerGstin ?? null,
+        body.sellerStateCode ?? null,
+        body.buyerGstin ?? null,
+        body.buyerState ?? null,
+        body.buyerStateCode ?? null,
+        Number(body.taxableAmount) || 0,
+        Number(body.sgstTotal) || 0,
+        Number(body.cgstTotal) || 0,
+        Number(body.igstTotal) || 0,
+        Number(body.roundOff) || 0,
+        body.amountInWords ?? null,
         req.user.id,
       ]
     );
@@ -169,15 +190,36 @@ router.put('/:id/payment', async (req, res, next) => {
       amountDue: 'amount_due',
       paymentMethod: 'payment_method',
       chequeNo: 'cheque_no',
+      isGstInvoice: 'is_gst_invoice',
+      gstType: 'gst_type',
+      sellerGstin: 'seller_gstin',
+      sellerStateCode: 'seller_state_code',
+      buyerGstin: 'buyer_gstin',
+      buyerState: 'buyer_state',
+      buyerStateCode: 'buyer_state_code',
+      taxableAmount: 'taxable_amount',
+      sgstTotal: 'sgst_total',
+      cgstTotal: 'cgst_total',
+      igstTotal: 'igst_total',
+      roundOff: 'round_off',
+      amountInWords: 'amount_in_words',
     };
-    const numeric = new Set(['discount', 'total', 'grandTotal', 'amountPaid', 'amountDue']);
+    const numeric = new Set([
+      'discount', 'total', 'grandTotal', 'amountPaid', 'amountDue',
+      'taxableAmount', 'sgstTotal', 'cgstTotal', 'igstTotal', 'roundOff',
+    ]);
+    const boolean = new Set(['isGstInvoice']);
 
     const sets = [];
     const vals = [];
     for (const [key, col] of Object.entries(colMap)) {
       if (Object.prototype.hasOwnProperty.call(body, key)) {
         sets.push(`${col} = ?`);
-        vals.push(numeric.has(key) ? (Number(body[key]) || 0) : (body[key] ?? null));
+        let value;
+        if (numeric.has(key)) value = Number(body[key]) || 0;
+        else if (boolean.has(key)) value = body[key] ? 1 : 0;
+        else value = body[key] ?? null;
+        vals.push(value);
       }
     }
     if (Object.prototype.hasOwnProperty.call(body, 'date')) {

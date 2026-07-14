@@ -23,6 +23,52 @@
     </ion-item>
   </ion-list>
 
+  <form [formGroup]="form" (ngSubmit)="saveProfile()">
+    <ion-list inset>
+      <ion-list-header>
+        <ion-label>Business / GST Profile</ion-label>
+      </ion-list-header>
+
+      <ion-item>
+        <ion-input label="Business Name" labelPlacement="stacked" formControlName="businessName" placeholder="Shree Sales Agency"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="Subtitle" labelPlacement="stacked" formControlName="subtitle" placeholder="School & Office Stationary Wholesaler"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="Address" labelPlacement="stacked" formControlName="address" placeholder="Old Rojgar Office Road, Becharpura, Palanpur"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="GSTIN" labelPlacement="stacked" formControlName="sellerGstin" placeholder="24AIVPR6534P1Z8"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="PAN" labelPlacement="stacked" formControlName="pan" placeholder="AIVPR6534P"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="Mobiles (comma separated)" labelPlacement="stacked" formControlName="mobiles" placeholder="92762 53587, 94275 13014"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="State" labelPlacement="stacked" formControlName="sellerState" placeholder="Gujarat"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="State Code" labelPlacement="stacked" formControlName="sellerStateCode" inputmode="numeric" placeholder="24"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="Bank Name" labelPlacement="stacked" formControlName="bankName" placeholder="IDBI Bank – Palanpur"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="Bank A/c No." labelPlacement="stacked" formControlName="bankAccountNo" placeholder="0323102000013767"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="IFSC" labelPlacement="stacked" formControlName="ifsc" placeholder="IBKL0000323"></ion-input>
+      </ion-item>
+    </ion-list>
+
+    <div class="ion-padding-horizontal">
+      <ion-button expand="block" type="submit">Save Business Profile</ion-button>
+    </div>
+  </form>
+
   <ion-list inset>
     <ion-item button (click)="logout()">
       <ion-label color="danger">Logout</ion-label>

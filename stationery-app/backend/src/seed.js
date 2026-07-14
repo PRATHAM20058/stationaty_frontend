@@ -31,41 +31,111 @@ const SCHEMA = [
      unit            VARCHAR(16)   NOT NULL DEFAULT 'pcs',
      sku             VARCHAR(80)   NULL,
      godown_location VARCHAR(160)  NULL,
+     hsn_code        VARCHAR(20)   NULL,
+     gst_percent     DECIMAL(5,2)  NULL,
      CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
    )`,
   `CREATE TABLE IF NOT EXISTS bills (
-     id             CHAR(36)      NOT NULL PRIMARY KEY,
-     bill_no        VARCHAR(40)   NOT NULL,
-     customer_name  VARCHAR(160)  NOT NULL,
-     customer_phone VARCHAR(40)   NULL,
-     date           DATETIME      NOT NULL,
-     discount       DECIMAL(10,2) NOT NULL DEFAULT 0,
-     total          DECIMAL(10,2) NOT NULL DEFAULT 0,
-     grand_total    DECIMAL(10,2) NOT NULL DEFAULT 0,
-     payment_status VARCHAR(16)   NOT NULL DEFAULT 'paid',
-     amount_paid    DECIMAL(10,2) NOT NULL DEFAULT 0,
-     amount_due     DECIMAL(10,2) NOT NULL DEFAULT 0,
-     payment_method VARCHAR(16)   NULL,
-     cheque_no      VARCHAR(60)   NULL
+     id                CHAR(36)      NOT NULL PRIMARY KEY,
+     bill_no           VARCHAR(40)   NOT NULL,
+     customer_name     VARCHAR(160)  NOT NULL,
+     customer_phone    VARCHAR(40)   NULL,
+     date              DATETIME      NOT NULL,
+     discount          DECIMAL(10,2) NOT NULL DEFAULT 0,
+     total             DECIMAL(10,2) NOT NULL DEFAULT 0,
+     grand_total       DECIMAL(10,2) NOT NULL DEFAULT 0,
+     payment_status    VARCHAR(16)   NOT NULL DEFAULT 'paid',
+     amount_paid       DECIMAL(10,2) NOT NULL DEFAULT 0,
+     amount_due        DECIMAL(10,2) NOT NULL DEFAULT 0,
+     payment_method    VARCHAR(16)   NULL,
+     cheque_no         VARCHAR(60)   NULL,
+     is_gst_invoice    TINYINT(1)    NOT NULL DEFAULT 0,
+     gst_type          VARCHAR(10)   NOT NULL DEFAULT 'none',
+     seller_gstin      VARCHAR(20)   NULL,
+     seller_state_code VARCHAR(4)    NULL,
+     buyer_gstin       VARCHAR(20)   NULL,
+     buyer_state       VARCHAR(60)   NULL,
+     buyer_state_code  VARCHAR(4)    NULL,
+     taxable_amount    DECIMAL(10,2) NOT NULL DEFAULT 0,
+     sgst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+     cgst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+     igst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+     round_off         DECIMAL(10,2) NOT NULL DEFAULT 0,
+     amount_in_words   VARCHAR(255)  NULL
    )`,
   `CREATE TABLE IF NOT EXISTS bill_items (
-     id        BIGINT AUTO_INCREMENT PRIMARY KEY,
-     bill_id   CHAR(36)      NOT NULL,
-     item_id   CHAR(36)      NULL,
-     item_name VARCHAR(160)  NOT NULL,
-     qty       DECIMAL(10,2) NOT NULL,
-     price     DECIMAL(10,2) NOT NULL,
-     subtotal  DECIMAL(10,2) NOT NULL,
-     discount  DECIMAL(10,2) NOT NULL DEFAULT 0,
+     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+     bill_id       CHAR(36)      NOT NULL,
+     item_id       CHAR(36)      NULL,
+     item_name     VARCHAR(160)  NOT NULL,
+     qty           DECIMAL(10,2) NOT NULL,
+     price         DECIMAL(10,2) NOT NULL,
+     subtotal      DECIMAL(10,2) NOT NULL,
+     discount      DECIMAL(10,2) NOT NULL DEFAULT 0,
+     hsn_code      VARCHAR(20)   NULL,
+     gst_percent   DECIMAL(5,2)  NOT NULL DEFAULT 0,
+     taxable_value DECIMAL(10,2) NULL,
+     sgst          DECIMAL(10,2) NOT NULL DEFAULT 0,
+     cgst          DECIMAL(10,2) NOT NULL DEFAULT 0,
+     igst          DECIMAL(10,2) NOT NULL DEFAULT 0,
      CONSTRAINT fk_bill_items_bill FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
    )`,
 ];
+
+// Columns added after the initial schema, applied to installs that predate them. MySQL has no
+// portable "ADD COLUMN IF NOT EXISTS", so each is guarded by an information_schema check.
+const GST_COLUMNS = {
+  items: [
+    ['hsn_code', 'VARCHAR(20) NULL'],
+    ['gst_percent', 'DECIMAL(5,2) NULL'],
+  ],
+  bill_items: [
+    ['hsn_code', 'VARCHAR(20) NULL'],
+    ['gst_percent', 'DECIMAL(5,2) NOT NULL DEFAULT 0'],
+    ['taxable_value', 'DECIMAL(10,2) NULL'],
+    ['sgst', 'DECIMAL(10,2) NOT NULL DEFAULT 0'],
+    ['cgst', 'DECIMAL(10,2) NOT NULL DEFAULT 0'],
+    ['igst', 'DECIMAL(10,2) NOT NULL DEFAULT 0'],
+  ],
+  bills: [
+    ['is_gst_invoice', 'TINYINT(1) NOT NULL DEFAULT 0'],
+    ['gst_type', "VARCHAR(10) NOT NULL DEFAULT 'none'"],
+    ['seller_gstin', 'VARCHAR(20) NULL'],
+    ['seller_state_code', 'VARCHAR(4) NULL'],
+    ['buyer_gstin', 'VARCHAR(20) NULL'],
+    ['buyer_state', 'VARCHAR(60) NULL'],
+    ['buyer_state_code', 'VARCHAR(4) NULL'],
+    ['taxable_amount', 'DECIMAL(10,2) NOT NULL DEFAULT 0'],
+    ['sgst_total', 'DECIMAL(10,2) NOT NULL DEFAULT 0'],
+    ['cgst_total', 'DECIMAL(10,2) NOT NULL DEFAULT 0'],
+    ['igst_total', 'DECIMAL(10,2) NOT NULL DEFAULT 0'],
+    ['round_off', 'DECIMAL(10,2) NOT NULL DEFAULT 0'],
+    ['amount_in_words', 'VARCHAR(255) NULL'],
+  ],
+};
 
 async function ensureSchema() {
   for (const ddl of SCHEMA) {
     await query(ddl);
   }
   await ensureOwnership();
+  await ensureGstColumns();
+}
+
+// Idempotently add the GST columns to older installs whose tables predate them.
+async function ensureGstColumns() {
+  for (const [table, columns] of Object.entries(GST_COLUMNS)) {
+    for (const [name, definition] of columns) {
+      const cols = await query(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [table, name]
+      );
+      if (cols.length === 0) {
+        await query(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+      }
+    }
+  }
 }
 
 // Add the owner column (`user_id`) to each data table for installs created before
