@@ -55,8 +55,8 @@ You need, on the Linux Lite PC:
 - The backend code (`stationery-app/backend/`). Either `git clone` your repo or copy the
   `backend/` folder over with a USB stick / `scp`.
 
-Decide a folder to run it from, e.g. `/opt/stationery-backend` or `~/stationery-backend`.
-This guide uses `~/stationery-backend`.
+Decide a folder to run it from, e.g. `/opt/backend` or `~/backend`.
+This guide uses `~/backend`.
 
 ---
 
@@ -123,10 +123,10 @@ SQL
 ```bash
 # option 1: clone your repo
 git clone <your-repo-url> ~/stationery-src
-cp -r ~/stationery-src/stationery-app/backend ~/stationery-backend
-# option 2: just copy the backend/ folder here by USB/scp, into ~/stationery-backend
+cp -r ~/stationery-src/stationery-app/backend ~/backend
+# option 2: just copy the backend/ folder here by USB/scp, into ~/backend
 
-cd ~/stationery-backend
+cd ~/backend
 cp .env.example .env
 nano .env
 ```
@@ -173,7 +173,7 @@ Press `Ctrl+C` to stop, then continue to step 5.
 Create a service unit:
 
 ```bash
-sudo nano /etc/systemd/system/stationery-backend.service
+sudo nano /etc/systemd/system/backend.service
 ```
 
 Paste (replace `YOUR_USER` with your Linux username, and fix the path if different):
@@ -188,7 +188,7 @@ Requires=mysql.service
 [Service]
 Type=simple
 User=YOUR_USER
-WorkingDirectory=/home/YOUR_USER/stationery-backend
+WorkingDirectory=/home/YOUR_USER/backend
 ExecStart=/usr/bin/node src/server.js
 Restart=always
 RestartSec=5
@@ -204,9 +204,9 @@ Enable and start it:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now stationery-backend
-sudo systemctl status stationery-backend       # should say "active (running)"
-journalctl -u stationery-backend -f            # live logs (Ctrl+C to exit)
+sudo systemctl enable --now backend
+sudo systemctl status backend       # should say "active (running)"
+journalctl -u backend -f            # live logs (Ctrl+C to exit)
 ```
 
 Now the backend starts automatically on every boot and restarts if it ever crashes.
@@ -240,17 +240,17 @@ changes below).
 ## 8. Maintenance cheatsheet
 
 ```bash
-sudo systemctl restart stationery-backend     # restart after a code/.env change
-sudo systemctl stop stationery-backend        # stop
-journalctl -u stationery-backend -n 100       # last 100 log lines
-journalctl -u stationery-backend -f           # follow logs
+sudo systemctl restart backend     # restart after a code/.env change
+sudo systemctl stop backend        # stop
+journalctl -u backend -n 100       # last 100 log lines
+journalctl -u backend -f           # follow logs
 
 # updating the code:
-cd ~/stationery-backend
+cd ~/backend
 git pull            # or re-copy files
 npm ci              # if dependencies changed
 npm run seed        # safe to re-run; applies any new migrations
-sudo systemctl restart stationery-backend
+sudo systemctl restart backend
 
 # database backup (run on a schedule / before updates):
 mysqldump -u stationery -p stationery > ~/stationery-backup-$(date +%F).sql
