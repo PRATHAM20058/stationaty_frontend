@@ -1,8 +1,10 @@
 # Stationery Shop — Backend API
 
 REST API for the offline-first Ionic/Angular Stationery Shop app. Node.js + Express + MySQL.
-The app syncs against this server as the shared source of truth. See `../BACKEND_PROMPT.md` and
-`../API_CONTRACT.md` for the full contract.
+The app keeps a local SQLite mirror (native SQLite on Android/iOS, `jeep-sqlite`/WASM over
+IndexedDB on the website) and syncs against this server as the shared source of truth — the
+backend itself is unaware of that local store. See `../BACKEND_PROMPT.md` and `../API_CONTRACT.md`
+for the full contract.
 
 ## Prerequisites
 

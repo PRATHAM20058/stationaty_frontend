@@ -109,6 +109,7 @@ Build a proper **local-first sync system**, not just a cache:
 
 **Local storage**
 - Use `@capacitor-community/sqlite` (preferred over Preferences here, since we need to query/filter items and bills locally, not just store blobs)
+- Engine per platform (same service, chosen at runtime): the **native SQLite** engine on Android/iOS, and **`jeep-sqlite`** (a WebAssembly SQLite persisted to IndexedDB) on the **website/web build**, so offline-first works in the browser too. On web, register the `jeep-sqlite` element and `initWebStore()`/`saveToStore()`; the WASM binary (`src/assets/sql-wasm.wasm`) must match the sql.js version baked into the installed `jeep-sqlite` (a mismatch throws a WASM `LinkError` and breaks the web DB only)
 - Mirror the same tables locally as on the server: `categories`, `items`, `bills`, `bill_items`
 - On every successful API fetch (items, categories, bills), overwrite the local SQLite cache with the latest server data
 - All reads (item list, category list, dashboard, billing search) should always read from local SQLite first, so the UI is instant and works with zero internet

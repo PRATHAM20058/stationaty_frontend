@@ -12,6 +12,11 @@ All endpoints below are relative to that base. All requests except `POST /auth/l
 must include `Authorization: Bearer <jwt>` (attached automatically by the app's HTTP
 interceptor). A `401` response anywhere logs the user out and redirects to `/login`.
 
+The client serves reads from a **local SQLite mirror** (native SQLite on Android/iOS,
+`jeep-sqlite`/WASM over IndexedDB on the website) and replays writes to these endpoints; the
+server is unaware of that local store. So `GET` responses are cached client-side and the
+server never sees the client-only `pending_sync` flag or `sync_queue`.
+
 ## Auth
 
 ### `POST /auth/login`

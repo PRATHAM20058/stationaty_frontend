@@ -59,9 +59,20 @@ npm install
 ionic serve
 ```
 
-Opens the app at `http://localhost:8100`. On web, the local database is backed by
-`jeep-sqlite` (a wasm SQLite running over IndexedDB), so offline-first behavior works
-in the browser too.
+Opens the app at `http://localhost:8100`.
+
+**Local database engine (web vs native).** The app keeps a local SQLite mirror for its
+offline-first behavior, and the **same `SqliteService`** picks the engine by platform:
+
+- **Website / browser (`ionic serve`, web build):** uses **`jeep-sqlite`** — a WebAssembly
+  build of SQLite persisted to **IndexedDB**. This is what makes offline-first work in the
+  browser. It's selected at runtime in `SqliteService.init()` when
+  `Capacitor.getPlatform() === 'web'`, and writes are flushed to IndexedDB via `saveToStore`.
+- **Android / iOS (native app):** uses the **native `@capacitor-community/sqlite`** engine
+  (real on-device SQLite). `jeep-sqlite`/WASM is **not** used on native.
+
+Because `jeep-sqlite` is web-only, anything about the WASM (the `sql-wasm.wasm` asset, the
+version note below) affects **only the website**, never the packaged Android/iOS app.
 
 ## Pointing at your backend
 
@@ -132,6 +143,36 @@ brew install --cask temurin@21
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 ```
 
+### Troubleshooting: web login stuck / `jeep-sqlite` WASM `LinkError`
+
+This only affects the **website** (`ionic serve` / web build) — the native Android/iOS app
+uses native SQLite and is never impacted.
+
+The web SQLite engine is `jeep-sqlite`, which loads the SQLite WASM binary from
+`src/assets/sql-wasm.wasm`. That file **must match the sql.js version whose JS glue is baked
+into the installed `jeep-sqlite`**. If they differ you get, on load:
+
+```
+LinkError: WebAssembly.instantiate() … "I": function import requires a callable
+```
+
+jeep-sqlite aborts, the browser database never initializes, and the app **hangs on the login
+screen after Sign In** (the login request itself may even succeed on the network).
+
+**Fix — keep the wasm aligned with jeep-sqlite's sql.js:**
+`jeep-sqlite@2.8.0` (published 2024-08-16) bakes sql.js **1.11.0**, so serve sql.js 1.11.0's
+wasm:
+
+```bash
+# grab the matching wasm and drop it into assets
+npm pack sql.js@1.11.0 && tar -xzf sql.js-1.11.0.tgz
+cp package/dist/sql-wasm.wasm src/assets/sql-wasm.wasm   # md5 f6ad6454…, 652953 bytes
+```
+
+Note: `src/assets/sql-wasm.wasm` is a **hand-placed** file (not auto-copied from
+`node_modules/sql.js`, which may be a newer, incompatible version). If you ever bump
+`jeep-sqlite`, re-copy the wasm from the sql.js version that release was built against.
+
 ## Project structure
 
 ```
@@ -176,7 +217,8 @@ for the additive field list.
 ## Offline-first behavior
 
 - All reads (items, categories, bills, dashboard, billing search) come from a local
-  SQLite cache first, so the UI is instant and fully usable offline.
+  SQLite cache first, so the UI is instant and fully usable offline. That cache is native
+  SQLite on device and `jeep-sqlite` (WASM SQLite over IndexedDB) on the website.
 - Every create/update/delete writes to SQLite immediately and queues a row in a local
   `sync_queue` table.
 - `SyncService` drains that queue whenever the app is online — on network reconnect,

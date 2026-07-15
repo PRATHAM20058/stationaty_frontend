@@ -13,8 +13,10 @@
 
 Build a REST API server that the already-built frontend can talk to. The frontend is
 **offline-first**: it reads/writes a local SQLite cache and replays queued writes to this
-backend when online (network reconnect, app resume, every 30s, and after each write). The
-backend is the shared source of truth that multiple devices sync against.
+backend when online (network reconnect, app resume, every 30s, and after each write). That
+client-side cache is native SQLite on Android/iOS and `jeep-sqlite` (WASM SQLite over
+IndexedDB) on the website — the backend is unaware of it either way. The backend is the shared
+source of truth that multiple devices sync against.
 
 The app id / product context:
 - App id: `com.mystore.stationery`
