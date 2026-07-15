@@ -55,7 +55,15 @@
       "Bash(export ANDROID_HOME=/Users/parmarpratham/Library/Android/sdk ANDROID_SDK_ROOT=/Users/parmarpratham/Library/Android/sdk)",
       "Bash(cd android *)",
       "Bash(curl -s -m5 -o /dev/null -w \"web :8100 -> %{http_code}\\\\n\" http://localhost:8100)",
-      "Bash(node billno-test.js)"
+      "Bash(node billno-test.js)",
+      "Read(//Users/parmarpratham/Downloads/**)",
+      "Bash([ -d \"$P\" ])",
+      "Bash(mkdir -p assets)",
+      "Bash(sips -s format png ~/Downloads/logo.jpg --out /tmp/logo_src.png)",
+      "Bash(sips -Z 1024 /tmp/logo_src.png --out /tmp/logo_fit.png)",
+      "Bash(sips -p 1024 1024 --padColor FFFFFF /tmp/logo_fit.png --out assets/logo.png)",
+      "Bash(sips -g pixelWidth -g pixelHeight assets/logo.png)",
+      "Bash(npx --yes @capacitor/assets@latest generate --android --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#ffffff')"
     ]
   }
 }

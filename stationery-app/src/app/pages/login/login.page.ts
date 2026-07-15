@@ -56,11 +56,6 @@ export class LoginPage {
     addIcons({ storefrontOutline, personOutline, lockClosedOutline });
   }
 
-  fillDemoCredentials(): void {
-    this.form.setValue({ username: 'admin', password: 'admin123' });
-    this.submit();
-  }
-
   async submit(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
