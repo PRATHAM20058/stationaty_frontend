@@ -87,4 +87,17 @@ function billToJson(billRow, itemRows) {
   };
 }
 
-module.exports = { categoryToJson, itemToJson, billItemToJson, billToJson, num };
+// `row` is a deleted_bills row; `itemRows` are its deleted_bill_items rows (already filtered).
+// Same shape as a live bill (its columns mirror `bills`) but keyed by the original bill id and
+// carrying the deletion metadata.
+function deletedBillToJson(row, itemRows) {
+  return {
+    ...billToJson(row, itemRows),
+    id: row.original_bill_id,
+    deletedAt: toIso(row.deleted_at),
+    deletedBy: row.deleted_by ?? null,
+    deleteReason: row.delete_reason ?? null,
+  };
+}
+
+module.exports = { categoryToJson, itemToJson, billItemToJson, billToJson, deletedBillToJson, num };

@@ -80,6 +80,61 @@ const SCHEMA = [
      igst          DECIMAL(10,2) NOT NULL DEFAULT 0,
      CONSTRAINT fk_bill_items_bill FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
    )`,
+  // Audit archive for deleted bills: DELETE /bills/:id moves the full record here instead of
+  // destroying it. Mirrors every `bills` column (incl. all GST fields) plus deletion metadata.
+  // NOTE: no UNIQUE on bill_no here -- the same invoice number may legitimately recur over time.
+  // (Maintenance: any new column added to `bills` must also be added here.)
+  `CREATE TABLE IF NOT EXISTS deleted_bills (
+     original_bill_id  CHAR(36)      NOT NULL PRIMARY KEY,
+     user_id           CHAR(36)      NOT NULL,
+     bill_no           VARCHAR(40)   NOT NULL,
+     customer_name     VARCHAR(160)  NOT NULL,
+     customer_phone    VARCHAR(40)   NULL,
+     date              DATETIME      NOT NULL,
+     discount          DECIMAL(10,2) NOT NULL DEFAULT 0,
+     total             DECIMAL(10,2) NOT NULL DEFAULT 0,
+     grand_total       DECIMAL(10,2) NOT NULL DEFAULT 0,
+     payment_status    VARCHAR(16)   NOT NULL DEFAULT 'paid',
+     amount_paid       DECIMAL(10,2) NOT NULL DEFAULT 0,
+     amount_due        DECIMAL(10,2) NOT NULL DEFAULT 0,
+     payment_method    VARCHAR(16)   NULL,
+     cheque_no         VARCHAR(60)   NULL,
+     is_gst_invoice    TINYINT(1)    NOT NULL DEFAULT 0,
+     gst_type          VARCHAR(10)   NOT NULL DEFAULT 'none',
+     seller_gstin      VARCHAR(20)   NULL,
+     seller_state_code VARCHAR(4)    NULL,
+     buyer_gstin       VARCHAR(20)   NULL,
+     buyer_state       VARCHAR(60)   NULL,
+     buyer_state_code  VARCHAR(4)    NULL,
+     taxable_amount    DECIMAL(10,2) NOT NULL DEFAULT 0,
+     sgst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+     cgst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+     igst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+     round_off         DECIMAL(10,2) NOT NULL DEFAULT 0,
+     amount_in_words   VARCHAR(255)  NULL,
+     deleted_at        DATETIME      NOT NULL,
+     deleted_by        CHAR(36)      NOT NULL,
+     delete_reason     VARCHAR(255)  NULL,
+     INDEX idx_deleted_bills_user_deleted (user_id, deleted_at),
+     INDEX idx_deleted_bills_user_orig (user_id, original_bill_id)
+   )`,
+  `CREATE TABLE IF NOT EXISTS deleted_bill_items (
+     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+     deleted_bill_id CHAR(36)      NOT NULL,
+     item_id         CHAR(36)      NULL,
+     item_name       VARCHAR(160)  NOT NULL,
+     qty             DECIMAL(10,2) NOT NULL,
+     price           DECIMAL(10,2) NOT NULL,
+     subtotal        DECIMAL(10,2) NOT NULL,
+     discount        DECIMAL(10,2) NOT NULL DEFAULT 0,
+     hsn_code        VARCHAR(20)   NULL,
+     gst_percent     DECIMAL(5,2)  NOT NULL DEFAULT 0,
+     taxable_value   DECIMAL(10,2) NULL,
+     sgst            DECIMAL(10,2) NOT NULL DEFAULT 0,
+     cgst            DECIMAL(10,2) NOT NULL DEFAULT 0,
+     igst            DECIMAL(10,2) NOT NULL DEFAULT 0,
+     CONSTRAINT fk_deleted_bill_items_bill FOREIGN KEY (deleted_bill_id) REFERENCES deleted_bills(original_bill_id) ON DELETE CASCADE
+   )`,
 ];
 
 // Columns added after the initial schema, applied to installs that predate them. MySQL has no

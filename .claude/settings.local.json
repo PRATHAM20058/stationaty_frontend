@@ -41,7 +41,11 @@
       "Read(//Applications/Chromium.app/Contents/MacOS/**)",
       "Read(//Users/parmarpratham/Library/Caches/ms-playwright/**)",
       "Bash(npm init *)",
-      "Bash(npm i *)"
+      "Bash(npm i *)",
+      "Bash(curl -s -m5 -o /dev/null -w \"backend  http://localhost:3000/api/health -> %{http_code}\\\\n\" http://localhost:3000/api/health)",
+      "Bash(curl -s -m5 -o /dev/null -w \"website  http://localhost:8100          -> %{http_code}\\\\n\" http://localhost:8100)",
+      "Bash(curl -s -m8 -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"admin123\"}' -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(node login-test.js)"
     ]
   }
 }

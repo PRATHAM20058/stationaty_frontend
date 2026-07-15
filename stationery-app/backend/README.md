@@ -63,13 +63,35 @@ All routes are under `/api`. Every route except `POST /auth/login` and `GET /hea
 | GET    | `/bills`                | All bills with nested `items` (incl. GST fields). |
 | POST   | `/bills`                | Full bill (incl. GST fields); server assigns `id` + a plain **8-digit** `billNo`. |
 | PUT    | `/bills/:id/payment`    | Payment patch **or** full-bill edit (idempotent upsert; carries GST fields). |
-| DELETE | `/bills/:id`            | `204`. |
+| DELETE | `/bills/:id`            | `204`. **Archives** the bill (see below) instead of destroying it; optional `{ reason }`. Idempotent. |
+| GET    | `/bills/deleted`        | The caller's archived bills with nested `items`, newest first. Optional `from`/`to` (deletion time), `limit` (≤500), `offset`. |
+| GET    | `/bills/deleted/:id`    | One archived bill (by original id). `404` if not the caller's. |
+| POST   | `/bills/deleted/:id/restore` | Move the archived bill back into `bills`/`bill_items`. `409` if a live bill with that id or `bill_no` exists. Returns the restored bill. |
+| DELETE | `/bills/deleted/:id`    | Hard purge from the archive. `204`. |
 
 ## Business rule: stock is client-authoritative
 
-The server never adjusts `items.stock_qty` on `POST /bills` or `DELETE /bills/:id`. The client
-already queues a separate `PUT /items/:id` with the new **absolute** `stockQty`, so adjusting here
-too would double-count. See §6 of `BACKEND_PROMPT.md`.
+The server never adjusts `items.stock_qty` on `POST /bills` or `DELETE /bills/:id` (nor on
+restore). The client already queues a separate `PUT /items/:id` with the new **absolute**
+`stockQty`, so adjusting here too would double-count. See §6 of `BACKEND_PROMPT.md`.
+
+## Deleted bill archive (additive)
+
+`DELETE /bills/:id` **archives** rather than destroys: in one transaction it copies the bill and
+all its line items — every GST field, the 8-digit `bill_no`, and who/when/why — into
+`deleted_bills` / `deleted_bill_items`, then removes them from the live tables. The response is
+still `204`, so the offline Ionic frontend and its sync queue need **no changes**.
+
+- **Idempotent.** The sync queue may replay a delete; a replay finds no live bill and returns
+  `204` without creating a duplicate archive row (`deleted_bills.original_bill_id` is the PK).
+- **Restorable.** `POST /bills/deleted/:id/restore` moves the record back byte-for-byte (via
+  `INSERT … SELECT`, so DECIMALs/totals/tax splits are identical), or `409` if a live bill with
+  that id or `bill_no` already exists.
+- **Multi-tenant.** Every archive read/insert/restore/purge filters on `user_id = req.user.id`;
+  a user can never see or restore another user's archived bill.
+- **Stock-neutral.** Neither delete nor restore touches `items.stock_qty`.
+- The archive tables carry no `UNIQUE` on `bill_no` (the same invoice number may recur there over
+  time). They're created by `npm run seed` (see Schema migrations below).
 
 ## GST tax invoices (additive)
 
@@ -90,10 +112,11 @@ that the client swaps for this server value on sync.
 
 ## Schema migrations
 
-`npm run seed` is idempotent and runs on boot: it creates the schema if missing and applies
-additive column migrations (multi-tenant `user_id`, and all the GST columns above) to older
-installs via `information_schema` checks — so deploying this update over an existing database
-adds the GST columns without data loss.
+`npm run seed` is idempotent and runs on boot: it creates the schema if missing (including the
+`deleted_bills` / `deleted_bill_items` archive tables) and applies additive column migrations
+(multi-tenant `user_id`, and all the GST columns above) to older installs via `information_schema`
+checks — so deploying this update over an existing database adds the new tables/columns without
+data loss, and re-running is a no-op.
 
 ## Quick smoke test
 
@@ -105,6 +128,30 @@ TOKEN=$(curl -s localhost:3000/api/auth/login -H 'Content-Type: application/json
 # create a category
 curl -s localhost:3000/api/categories -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d '{"name":"Pens"}'
+```
+
+### Deleted-bill archive smoke test
+
+```bash
+# create a bill, capture its server id
+BILL_ID=$(curl -s localhost:3000/api/bills -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"customerName":"Test","discount":0,"total":10,"grandTotal":10,"paymentStatus":"paid","amountPaid":10,"amountDue":0,"paymentMethod":"cash","items":[{"itemName":"x","qty":1,"price":10,"subtotal":10,"discount":0}]}' \
+  | node -pe 'JSON.parse(require("fs").readFileSync(0)).id')
+
+# archive it (204), optionally with a reason
+curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "localhost:3000/api/bills/$BILL_ID" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"reason":"entered by mistake"}'
+
+# it's gone from /bills, present in /bills/deleted
+curl -s "localhost:3000/api/bills/deleted" -H "Authorization: Bearer $TOKEN"
+curl -s "localhost:3000/api/bills/deleted/$BILL_ID" -H "Authorization: Bearer $TOKEN"
+
+# restore it back into /bills (returns the restored bill)
+curl -s -X POST "localhost:3000/api/bills/deleted/$BILL_ID/restore" -H "Authorization: Bearer $TOKEN"
+
+# (or purge it from the archive for good)
+# curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "localhost:3000/api/bills/deleted/$BILL_ID" -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Default credentials

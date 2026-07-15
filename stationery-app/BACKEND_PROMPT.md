@@ -179,6 +179,31 @@ CREATE TABLE IF NOT EXISTS bill_items (
   igst          DECIMAL(10,2) NOT NULL DEFAULT 0,
   CONSTRAINT fk_bill_items_bill FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
 );
+
+-- Audit archive for deleted bills (see §6b). `deleted_bills` mirrors EVERY `bills` column plus
+-- deletion metadata; `deleted_bill_items` mirrors EVERY `bill_items` column. No UNIQUE on
+-- `bill_no` here (the same invoice number may recur over time). A future `bills` column must
+-- also be added to `deleted_bills`.
+CREATE TABLE IF NOT EXISTS deleted_bills (
+  original_bill_id  CHAR(36)      NOT NULL PRIMARY KEY,  -- the source bill's id
+  user_id           CHAR(36)      NOT NULL,
+  -- ... every other `bills` column, same names/types (bill_no, customer_*, date, discount,
+  -- total, grand_total, payment_*, cheque_no, is_gst_invoice, gst_type, seller/buyer *,
+  -- taxable_amount, sgst_total, cgst_total, igst_total, round_off, amount_in_words) ...
+  deleted_at        DATETIME      NOT NULL,
+  deleted_by        CHAR(36)      NOT NULL,               -- user id from the JWT
+  delete_reason     VARCHAR(255)  NULL,
+  INDEX idx_deleted_bills_user_deleted (user_id, deleted_at),
+  INDEX idx_deleted_bills_user_orig    (user_id, original_bill_id)
+);
+
+CREATE TABLE IF NOT EXISTS deleted_bill_items (
+  id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+  deleted_bill_id CHAR(36)      NOT NULL,
+  -- ... every `bill_items` column except id/bill_id (item_id, item_name, qty, price, subtotal,
+  -- discount, hsn_code, gst_percent, taxable_value, sgst, cgst, igst) ...
+  CONSTRAINT fk_deleted_bill_items FOREIGN KEY (deleted_bill_id) REFERENCES deleted_bills(original_bill_id) ON DELETE CASCADE
+);
 ```
 
 > **GST fields are additive & backward compatible.** All columns above added for GST are
@@ -280,7 +305,11 @@ Bill JSON shape (returned by `GET /bills`, and the body of `POST /bills`):
 | `GET /bills`             | –                                     | 200     | Return **all** bills with their `items` array nested. Client filters by date/status/customer locally. |
 | `POST /bills`            | full bill object (see below)          | 201     | Persist bill + its line items in one transaction. **Ignore** any incoming `id`/`billNo` and assign your own; return the full bill with the server `id` and `billNo`. |
 | `PUT /bills/:id/payment` | payment patch **or** full bill        | 200     | Dual-purpose — see below. |
-| `DELETE /bills/:id`      | –                                     | 204     | Delete the bill and its `bill_items` (FK cascade). |
+| `DELETE /bills/:id`      | optional `{ reason }`                 | 204     | **Archive** the bill (move it + items to `deleted_bills`/`deleted_bill_items` in one txn), then remove from live. Idempotent on replay. See §6b. |
+| `GET /bills/deleted`     | –                                     | 200     | Caller's archived bills w/ nested `items`, newest-deleted first. Optional `from`/`to` (deletion time), `limit` (≤500), `offset`. |
+| `GET /bills/deleted/:id` | –                                     | 200/404 | One archived bill by original id (this user's). |
+| `POST /bills/deleted/:id/restore` | –                            | 200/404/409 | Move archived bill back to live tables; `409` if a live bill with that id or `bill_no` exists. Returns the restored bill. **No stock change.** |
+| `DELETE /bills/deleted/:id` | –                                  | 204     | Hard-purge from the archive. |
 
 **`POST /bills` details.** The client sends the whole bill (including the additive GST fields)
 plus a *temporary* local `id` (`local-...`) and a placeholder `billNo` (`BILL-<timestamp>`).
@@ -328,6 +357,27 @@ create, stock would be reduced twice (once by the item PUT, once by the bill POS
 
 (If you later want the server to be authoritative for stock instead, that's a bigger design change
 and would require the client to stop sending absolute stock — out of scope for v1.)
+
+## 6b. Deleted bill archive (archive, don't destroy)
+
+`DELETE /bills/:id` must **preserve** the record, not drop it. In one transaction: read the bill +
+its items (scoped to `req.user.id`), `INSERT … SELECT` them into `deleted_bills` /
+`deleted_bill_items` (copying every column incl. all GST fields and the 8-digit `bill_no`, plus
+`deleted_at`, `deleted_by` = the JWT user, and optional `delete_reason` from the body), then delete
+from the live tables. Roll back on any error. Keep the `204` response — the frontend is unchanged.
+
+Rules:
+- **Idempotent.** The sync queue can replay a delete. If there's no live bill for that id (already
+  archived, or never existed), return `204` without inserting a duplicate archive row
+  (`deleted_bills.original_bill_id` is the PK).
+- **Multi-tenant.** Every archive read/insert/restore/purge filters on `user_id = req.user.id`.
+- **Stock-neutral.** Neither delete nor restore touches `items.stock_qty` (§6 still holds).
+- **Restore** (`POST /bills/deleted/:id/restore`) is the transactional inverse; `409` if a live
+  bill with that id or `bill_no` already exists. Use `INSERT … SELECT` so totals/tax splits and the
+  original `bill_no` come back byte-for-byte.
+
+This is **additive** — it introduces the two archive tables and the four `/bills/deleted…`
+endpoints without changing any existing request/response, so the shipped frontend needs no changes.
 
 ## 7. Auth & seeding details
 

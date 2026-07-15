@@ -3,12 +3,23 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool, query } = require('../db');
-const { billToJson } = require('../mappers');
+const { billToJson, deletedBillToJson } = require('../mappers');
 
 const router = express.Router();
 
 const PAYMENT_STATUSES = ['paid', 'pending', 'partial'];
 const PAYMENT_METHODS = ['cash', 'upi', 'cheque'];
+
+// Every `bills` column except `id` (kept in this exact order for INSERT ... SELECT between the
+// live `bills` table and the `deleted_bills` archive, so DECIMALs copy byte-for-byte in-DB).
+const BILL_COLS_NO_ID =
+  'user_id, bill_no, customer_name, customer_phone, date, discount, total, grand_total, ' +
+  'payment_status, amount_paid, amount_due, payment_method, cheque_no, is_gst_invoice, gst_type, ' +
+  'seller_gstin, seller_state_code, buyer_gstin, buyer_state, buyer_state_code, taxable_amount, ' +
+  'sgst_total, cgst_total, igst_total, round_off, amount_in_words';
+// Every `bill_items` column except the auto `id` and the bill foreign key.
+const BILL_ITEM_COLS =
+  'item_id, item_name, qty, price, subtotal, discount, hsn_code, gst_percent, taxable_value, sgst, cgst, igst';
 
 // Convert the client's ISO-8601 instant to a MySQL DATETIME string (UTC).
 function toMysqlDate(iso) {
@@ -81,6 +92,128 @@ router.get('/', async (req, res, next) => {
       byBill.get(it.bill_id).push(it);
     }
     res.json(bills.map((b) => billToJson(b, byBill.get(b.id) || [])));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Deleted-bill archive --------------------------------------------------------------------
+// These `/deleted...` routes are declared BEFORE the `/:id` routes below so `deleted` is never
+// captured as an `:id`. All are user-scoped (a user never sees another user's archived bills).
+
+// GET /bills/deleted -> the caller's archived bills (newest first), with nested items.
+// Optional `from`/`to` filter by deletion time; `limit` (default 100, max 500) / `offset`.
+router.get('/deleted', async (req, res, next) => {
+  try {
+    const clauses = ['user_id = ?'];
+    const vals = [req.user.id];
+    if (req.query.from) {
+      clauses.push('deleted_at >= ?');
+      vals.push(toMysqlDate(req.query.from));
+    }
+    if (req.query.to) {
+      clauses.push('deleted_at <= ?');
+      vals.push(toMysqlDate(req.query.to));
+    }
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    const bills = await query(
+      `SELECT * FROM deleted_bills WHERE ${clauses.join(' AND ')} ORDER BY deleted_at DESC LIMIT ? OFFSET ?`,
+      [...vals, limit, offset]
+    );
+    if (bills.length === 0) return res.json([]);
+
+    const ids = bills.map((b) => b.original_bill_id);
+    const placeholders = ids.map(() => '?').join(',');
+    const items = await query(
+      `SELECT * FROM deleted_bill_items WHERE deleted_bill_id IN (${placeholders}) ORDER BY id`,
+      ids
+    );
+    const byBill = new Map();
+    for (const it of items) {
+      if (!byBill.has(it.deleted_bill_id)) byBill.set(it.deleted_bill_id, []);
+      byBill.get(it.deleted_bill_id).push(it);
+    }
+    res.json(bills.map((b) => deletedBillToJson(b, byBill.get(b.original_bill_id) || [])));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /bills/deleted/:id -> one archived bill (this user's), or 404.
+router.get('/deleted/:id', async (req, res, next) => {
+  try {
+    const bills = await query('SELECT * FROM deleted_bills WHERE original_bill_id = ? AND user_id = ?', [
+      req.params.id,
+      req.user.id,
+    ]);
+    if (bills.length === 0) return res.status(404).json({ message: 'Deleted bill not found' });
+    const items = await query('SELECT * FROM deleted_bill_items WHERE deleted_bill_id = ? ORDER BY id', [req.params.id]);
+    res.json(deletedBillToJson(bills[0], items));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /bills/deleted/:id/restore -> move the archived record back into bills/bill_items and
+// remove it from the archive. 404 if not this user's; 409 if a live bill with that id or bill_no
+// already exists. Does NOT touch stock (stock is client-authoritative). Returns the restored bill.
+router.post('/deleted/:id/restore', async (req, res, next) => {
+  const id = req.params.id;
+  const userId = req.user.id;
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [arch] = await conn.query('SELECT bill_no FROM deleted_bills WHERE original_bill_id = ? AND user_id = ?', [
+      id,
+      userId,
+    ]);
+    if (arch.length === 0) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'Deleted bill not found' });
+    }
+
+    const [conflict] = await conn.query('SELECT id FROM bills WHERE (id = ? OR bill_no = ?) AND user_id = ?', [
+      id,
+      arch[0].bill_no,
+      userId,
+    ]);
+    if (conflict.length > 0) {
+      await conn.rollback();
+      return res.status(409).json({ message: 'A live bill with this id or bill number already exists' });
+    }
+
+    await conn.query(
+      `INSERT INTO bills (id, ${BILL_COLS_NO_ID})
+       SELECT original_bill_id, ${BILL_COLS_NO_ID} FROM deleted_bills WHERE original_bill_id = ? AND user_id = ?`,
+      [id, userId]
+    );
+    await conn.query(
+      `INSERT INTO bill_items (bill_id, ${BILL_ITEM_COLS})
+       SELECT deleted_bill_id, ${BILL_ITEM_COLS} FROM deleted_bill_items WHERE deleted_bill_id = ?`,
+      [id]
+    );
+    await conn.query('DELETE FROM deleted_bills WHERE original_bill_id = ? AND user_id = ?', [id, userId]);
+
+    await conn.commit();
+    const restored = await loadBill(id, userId);
+    res.json(restored);
+  } catch (err) {
+    await conn.rollback();
+    next(err);
+  } finally {
+    conn.release();
+  }
+});
+
+// DELETE /bills/deleted/:id -> hard purge from the archive (this user's). 204, idempotent.
+router.delete('/deleted/:id', async (req, res, next) => {
+  try {
+    await query('DELETE FROM deleted_bills WHERE original_bill_id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    res.status(204).end();
   } catch (err) {
     next(err);
   }
@@ -251,13 +384,52 @@ router.put('/:id/payment', async (req, res, next) => {
   }
 });
 
-// DELETE /bills/:id -> 204 (only the caller's own bill). FK cascade removes bill_items. Do NOT restore stock.
+// DELETE /bills/:id -> 204 (only the caller's own bill). Instead of destroying the record, move
+// the full bill + items into the deleted_bills/deleted_bill_items archive, transactionally.
+// Accepts an optional { reason } in the body. Idempotent: replays (the sync queue can send the
+// same delete more than once) short-circuit to 204 without creating a duplicate archive row.
+// Do NOT touch stock -- it's client-authoritative.
 router.delete('/:id', async (req, res, next) => {
+  const id = req.params.id;
+  const userId = req.user.id;
+  const rawReason = req.body && typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+  const reason = rawReason ? rawReason.slice(0, 255) : null;
+
+  const conn = await pool.getConnection();
   try {
-    await query('DELETE FROM bills WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    await conn.beginTransaction();
+
+    const [live] = await conn.query('SELECT id FROM bills WHERE id = ? AND user_id = ?', [id, userId]);
+    if (live.length === 0) {
+      // Nothing live to delete: either it never existed, or this is a replay of an already-
+      // archived delete. Preserve today's missing-bill behavior and stay idempotent.
+      await conn.commit();
+      return res.status(204).end();
+    }
+
+    // Defensive: clear any stale archive row for this id so the archive insert can't duplicate.
+    await conn.query('DELETE FROM deleted_bills WHERE original_bill_id = ? AND user_id = ?', [id, userId]);
+
+    await conn.query(
+      `INSERT INTO deleted_bills (original_bill_id, ${BILL_COLS_NO_ID}, deleted_at, deleted_by, delete_reason)
+       SELECT id, ${BILL_COLS_NO_ID}, ?, ?, ? FROM bills WHERE id = ? AND user_id = ?`,
+      [toMysqlDate(), userId, reason, id, userId]
+    );
+    await conn.query(
+      `INSERT INTO deleted_bill_items (deleted_bill_id, ${BILL_ITEM_COLS})
+       SELECT bill_id, ${BILL_ITEM_COLS} FROM bill_items WHERE bill_id = ?`,
+      [id]
+    );
+
+    await conn.query('DELETE FROM bills WHERE id = ? AND user_id = ?', [id, userId]); // FK cascade removes bill_items
+
+    await conn.commit();
     res.status(204).end();
   } catch (err) {
+    await conn.rollback();
     next(err);
+  } finally {
+    conn.release();
   }
 });
 

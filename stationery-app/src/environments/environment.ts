@@ -7,7 +7,8 @@ export const environment = {
   // Android emulator reaches the host Mac at 10.0.2.2 (not localhost).
   // For browser dev (ionic serve / ng serve) change this back to http://localhost:3000/api.
 //   apiUrl: 'http://10.0.2.2:3000/api',
-  apiUrl: 'https://kali-pc.tail0f71f2.ts.net/api',
+//   apiUrl: 'https://kali-pc.tail0f71f2.ts.net/api',
+  apiUrl: 'http://localhost:3000/api',
   lowStockThreshold: 5,
   // Your company details, printed on every bill / invoice. The full GST seller profile
   // (address, state code, bank, etc.) is editable in Settings and stored via SellerConfigService;

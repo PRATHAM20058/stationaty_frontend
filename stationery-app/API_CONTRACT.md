@@ -193,6 +193,43 @@ by the sync engine if a delete was queued while offline. As with create, **do no
 item stock here** — the app already queues `PUT /items/:id` updates with the restored
 absolute `stockQty` for each line, so restoring server-side too would double-count.
 
+Server-side this is **archive, not destroy**: the bill and its line items (all GST fields,
+the 8-digit `billNo`, and who/when/why) are moved into a deleted-bill archive in one
+transaction. This is **additive and transparent to the frontend** — the request/response is
+unchanged (`DELETE` → `204`), the client sends nothing new (an optional `{ "reason": "…" }`
+body is accepted but the app doesn't send one), and replays stay idempotent (a second delete
+of the same id still returns `204` with no duplicate archive row).
+
+## Deleted-bill archive (additive; not used by the current frontend)
+
+These endpoints expose the archive for an audit/restore UI. They're all user-scoped and require
+the same `Authorization: Bearer <jwt>`. The current Ionic app does not call them; they don't
+change any existing behavior.
+
+An **archived bill** is the same JSON shape as a normal bill (`id` is the *original* bill id,
+`billNo`, `items[]`, all totals and GST fields) plus:
+```json
+{ "deletedAt": "ISO 8601 string", "deletedBy": "user id", "deleteReason": "string | null" }
+```
+
+### `GET /bills/deleted`
+The caller's archived bills with nested `items`, newest-deleted first. Optional query params:
+`from` / `to` (ISO instants, filter by **deletion time**), `limit` (default 100, max 500),
+`offset`. Response `200`: array of archived bills.
+
+### `GET /bills/deleted/:id`
+One archived bill (by its original id). `200` with the archived bill, or `404` if it isn't the
+caller's.
+
+### `POST /bills/deleted/:id/restore`
+Moves the archived bill back into the live tables (byte-for-byte, so totals/tax splits and the
+original `billNo` are identical) and removes it from the archive. `200` with the restored bill;
+`404` if not the caller's; `409` if a live bill with that id or `billNo` already exists.
+**Does not touch stock.**
+
+### `DELETE /bills/deleted/:id`
+Hard-purges the archived bill permanently. Response `204` (idempotent).
+
 ## Notes for the backend implementation
 
 - IDs are opaque strings — the frontend never assumes they're numeric, since offline-created
