@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, ViewChild, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -23,11 +23,13 @@ import {
   IonSkeletonText,
   AlertController,
   ToastController,
+  LoadingController,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { addOutline, trashOutline, createOutline, cubeOutline } from 'ionicons/icons';
+import { addOutline, trashOutline, createOutline, cubeOutline, cloudUploadOutline, downloadOutline } from 'ionicons/icons';
 import { ItemService } from '../../core/services/item.service';
 import { CategoryService } from '../../core/services/category.service';
+import { ItemImportService } from '../../core/services/item-import.service';
 import { Item } from '../../core/models/item.model';
 import { Category } from '../../core/models/category.model';
 import { environment } from '../../../environments/environment';
@@ -67,16 +69,20 @@ export class ItemsPage implements OnInit {
   selectedCategoryId: string | null = null;
   lowStockThreshold = environment.lowStockThreshold;
 
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+
   private destroyRef = inject(DestroyRef);
 
   constructor(
     private itemService: ItemService,
     private categoryService: CategoryService,
+    private itemImportService: ItemImportService,
     private router: Router,
     private alertController: AlertController,
     private toastController: ToastController,
+    private loadingController: LoadingController,
   ) {
-    addIcons({ addOutline, trashOutline, createOutline, cubeOutline });
+    addIcons({ addOutline, trashOutline, createOutline, cubeOutline, cloudUploadOutline, downloadOutline });
   }
 
   ngOnInit(): void {
@@ -114,6 +120,66 @@ export class ItemsPage implements OnInit {
 
   goToNew(): void {
     this.router.navigateByUrl('/items/new');
+  }
+
+  /** Generates and hands the user a ready-to-fill Excel template with the exact columns. */
+  async downloadTemplate(): Promise<void> {
+    try {
+      await this.itemImportService.downloadTemplate();
+    } catch (err: any) {
+      const toast = await this.toastController.create({
+        message: `Could not create the template. ${err?.message ?? ''}`.trim(),
+        duration: 2500,
+        color: 'danger',
+      });
+      await toast.present();
+    }
+  }
+
+  /** Opens the file explorer to pick an Excel file of items to bulk-import. */
+  openImport(): void {
+    this.fileInput.nativeElement.click();
+  }
+
+  /** Parses the chosen Excel file, creates each item, and reports the result. */
+  async onExcelSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const loading = await this.loadingController.create({ message: 'Importing items…' });
+    await loading.present();
+    try {
+      const buffer = await file.arrayBuffer();
+      const result = await this.itemImportService.importFromArrayBuffer(buffer);
+      await loading.dismiss();
+
+      const errorLines = result.errors.slice(0, 8).map((e) => `Row ${e.row}: ${e.message}`);
+      if (result.errors.length > 8) errorLines.push(`…and ${result.errors.length - 8} more`);
+      const summary = [`${result.created} item(s) imported.`];
+      if (result.skipped) summary.push(`${result.skipped} row(s) skipped.`);
+      const message = summary.join(' ') + (errorLines.length ? `\n\n${errorLines.join('\n')}` : '');
+
+      const alert = await this.alertController.create({
+        header: result.created > 0 ? 'Import complete' : 'Nothing imported',
+        message,
+        cssClass: 'import-result-alert',
+        buttons: ['OK'],
+      });
+      await alert.present();
+      await this.load();
+    } catch (err: any) {
+      await loading.dismiss();
+      const toast = await this.toastController.create({
+        message: `Could not read that file. ${err?.message ?? ''}`.trim(),
+        duration: 2500,
+        color: 'danger',
+      });
+      await toast.present();
+    } finally {
+      // Reset so picking the same file again still fires (change) next time.
+      input.value = '';
+    }
   }
 
   goToDetail(item: Item): void {

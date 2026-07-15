@@ -643,3 +643,9 @@ body.barcode-scanner-active {
     background: transparent;
   }
 }
+
+/* Preserve newlines in the Items "Import from Excel" result alert so the per-row
+   skip reasons render on separate lines. */
+ion-alert.import-result-alert .alert-message {
+  white-space: pre-line;
+}
