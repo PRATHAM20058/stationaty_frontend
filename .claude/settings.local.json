@@ -47,7 +47,15 @@
       "Bash(curl -s -m8 -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"admin123\"}' -o /dev/null -w \"%{http_code}\\\\n\")",
       "Bash(node login-test.js)",
       "Bash(node -e 'const a=JSON.parse\\(require\\(\"fs\"\\).readFileSync\\(0\\)\\);console.log\\(\"live bills count:\",a.length\\);a.slice\\(0,3\\).forEach\\(b=>console.log\\(\"  \"+b.billNo+\"  ₹\"+b.grandTotal+\"  id=\"+b.id\\)\\)')",
-      "Bash(node -e \"console.log\\('xlsx version:', require\\('./node_modules/xlsx/package.json'\\).version\\)\")"
+      "Bash(node -e \"console.log\\('xlsx version:', require\\('./node_modules/xlsx/package.json'\\).version\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(tail -2)",
+      "Bash(echo \"=== gradle assembleDebug ===\")",
+      "Bash(export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home)",
+      "Bash(export ANDROID_HOME=/Users/parmarpratham/Library/Android/sdk ANDROID_SDK_ROOT=/Users/parmarpratham/Library/Android/sdk)",
+      "Bash(cd android *)",
+      "Bash(curl -s -m5 -o /dev/null -w \"web :8100 -> %{http_code}\\\\n\" http://localhost:8100)",
+      "Bash(node billno-test.js)"
     ]
   }
 }

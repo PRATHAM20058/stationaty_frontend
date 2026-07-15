@@ -32,6 +32,7 @@ import {
 } from 'ionicons/icons';
 import { BillingService } from '../../core/services/billing.service';
 import { PdfService } from '../../core/services/pdf.service';
+import { SyncTriggerService } from '../../core/services/sync-trigger.service';
 import { Bill, BillItem, PaymentMethod } from '../../core/models/bill.model';
 import { PaymentModalComponent } from '../../shared/components/payment-modal/payment-modal.component';
 import { environment } from '../../../environments/environment';
@@ -79,6 +80,7 @@ export class BillDetailPage implements OnInit {
     private router: Router,
     private billingService: BillingService,
     private pdfService: PdfService,
+    private syncTrigger: SyncTriggerService,
     private modalController: ModalController,
     private toastController: ToastController,
     private alertController: AlertController,
@@ -117,10 +119,44 @@ export class BillDetailPage implements OnInit {
     if (!this.bill) return;
     this.sharing = true;
     try {
-      await this.pdfService.shareBillPdf(this.bill);
+      // The invoice must print the server's final 8-digit bill number, never the temporary
+      // offline placeholder (BILL-<timestamp>). If the bill hasn't synced yet, nudge a sync and
+      // wait briefly for the real number before generating the PDF.
+      if (this.isTempBillNo(this.bill.billNo)) {
+        const finalized = await this.waitForFinalBillNo();
+        if (!finalized) {
+          const toast = await this.toastController.create({
+            message: 'This bill hasn’t synced yet. Connect to the internet so its final invoice number is assigned, then share.',
+            duration: 3500,
+            color: 'warning',
+          });
+          await toast.present();
+          return;
+        }
+      }
+      await this.pdfService.shareBillPdf(this.bill!);
     } finally {
       this.sharing = false;
     }
+  }
+
+  /** True for the client's temporary offline number (BILL-<timestamp>); false for a server
+      number (plain 8-digit, or a legacy BILL-000123). Used to avoid printing the placeholder. */
+  private isTempBillNo(billNo: string | undefined): boolean {
+    return /^BILL-\d{10,}$/.test(billNo ?? '');
+  }
+
+  /** Nudges a sync and waits (up to ~8s) for this bill's create to sync so `bill.billNo` becomes
+      the server's final 8-digit number. The remapped$ subscription reloads `this.bill` in the
+      background; we poll it. Returns true once finalized, false on timeout (e.g. offline). */
+  private async waitForFinalBillNo(timeoutMs = 8000): Promise<boolean> {
+    this.syncTrigger.requestSync();
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (this.bill && !this.isTempBillNo(this.bill.billNo)) return true;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    return !!this.bill && !this.isTempBillNo(this.bill.billNo);
   }
 
   async markAsPaid(): Promise<void> {
