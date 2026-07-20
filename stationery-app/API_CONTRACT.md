@@ -12,6 +12,11 @@ All endpoints below are relative to that base. All requests except `POST /auth/l
 must include `Authorization: Bearer <jwt>` (attached automatically by the app's HTTP
 interceptor). A `401` response anywhere logs the user out and redirects to `/login`.
 
+The client serves reads from a **local SQLite mirror** (native SQLite on Android/iOS,
+`jeep-sqlite`/WASM over IndexedDB on the website) and replays writes to these endpoints; the
+server is unaware of that local store. So `GET` responses are cached client-side and the
+server never sees the client-only `pending_sync` flag or `sync_queue`.
+
 ## Auth
 
 ### `POST /auth/login`
@@ -72,17 +77,23 @@ Returns all items (frontend does search/filter/low-stock locally against its cac
   "stockQty": 0,
   "unit": "pcs | box | dozen | pack",
   "sku": "string | null",
-  "godownLocation": "string | null"
+  "godownLocation": "string | null",
+  "hsnCode": "string | null",
+  "gstPercent": "number | null  // one of 0, 5, 12, 18, 28"
 }]
 ```
 
+`hsnCode` and `gstPercent` are **optional, additive** GST fields (nullable, default `NULL`).
+Legacy items without them behave exactly as before.
+
 ### `POST /items`
-Request body: item fields minus `id`.
+Request body: item fields minus `id` (now including the optional `hsnCode` / `gstPercent`).
 Response `201`: full item including server-assigned `id`.
 
 ### `PUT /items/:id`
 Request body: item fields minus `id` (full replace, including `stockQty` — the app
-sends the item's new absolute stock quantity after billing reduces it, not a delta).
+sends the item's new absolute stock quantity after billing reduces it, not a delta — and
+the optional `hsnCode` / `gstPercent`).
 Response `200`.
 
 ### `DELETE /items/:id`
@@ -99,7 +110,10 @@ Returns all bills (frontend filters by date/status/customer locally).
   "customerName": "string",
   "customerPhone": "string | null",
   "date": "ISO 8601 string",
-  "items": [{ "itemId": "string", "itemName": "string", "qty": 0, "price": 0, "subtotal": 0, "discount": 0 }],
+  "items": [{
+    "itemId": "string", "itemName": "string", "qty": 0, "price": 0, "subtotal": 0, "discount": 0,
+    "hsnCode": "string | null", "gstPercent": 0, "taxableValue": 0, "sgst": 0, "cgst": 0, "igst": 0
+  }],
   "discount": 0,
   "total": 0,
   "grandTotal": 0,
@@ -107,15 +121,39 @@ Returns all bills (frontend filters by date/status/customer locally).
   "amountPaid": 0,
   "amountDue": 0,
   "paymentMethod": "cash | upi | cheque | null",
-  "chequeNo": "string | undefined (only meaningful when paymentMethod is 'cheque'; optional, may be added after the bill is created)"
+  "chequeNo": "string | undefined (only meaningful when paymentMethod is 'cheque'; optional, may be added after the bill is created)",
+
+  "isGstInvoice": false,
+  "gstType": "intra | inter | none",
+  "sellerGstin": "string | undefined",
+  "sellerStateCode": "string | undefined",
+  "buyerGstin": "string | null",
+  "buyerState": "string | null",
+  "buyerStateCode": "string | null",
+  "taxableAmount": 0,
+  "sgstTotal": 0,
+  "cgstTotal": 0,
+  "igstTotal": 0,
+  "roundOff": 0,
+  "amountInWords": "string | undefined"
 }]
 ```
 
+All the GST fields above (line-level and bill-level) are **optional and additive**
+(nullable / defaulted to `0` / `false` / `"none"`). For a non-GST bill every tax and
+`roundOff` is `0`, `gstType` is `"none"`, and `grandTotal` still equals `total - discount`.
+When `isGstInvoice` is true, `grandTotal = taxableAmount + sgstTotal + cgstTotal + igstTotal
++ roundOff` (rounded to the nearest rupee, the difference captured in `roundOff`). The server
+should persist-and-echo whatever GST columns it stores and ignore any it doesn't yet — the
+contract stays backward compatible.
+
 ### `POST /bills`
-Request body: the full bill object. The app generates a temporary `billNo` and `id`
-locally (offline or not) and includes them, but the server should **ignore** them and
-assign its own; the server's response values replace them once synced.
-Response `201`: full bill including server-assigned `id` and `billNo`.
+Request body: the full bill object (including the additive GST fields above). The app
+generates a temporary `billNo` (`BILL-<timestamp>`) and `id` (`local-<ts>-<rand>`) locally
+(offline or not) and includes them, but the server should **ignore** them and assign its own;
+the server's response values replace them once synced.
+Response `201`: full bill including the server-assigned `id` and a plain, sequential
+**8-digit** `billNo` (`00000001`, `00000002`, … — per-user numbering).
 
 **Do not decrement item stock on this endpoint.** Stock is client-authoritative: when a
 bill is created the app also queues a `PUT /items/:id` for each line carrying the new
@@ -145,14 +183,52 @@ Response `200`.
 
 Editing a bill's line items (via "Edit Items" on the bill detail page) is also replayed
 as an `update` action on this endpoint, sending the full recomputed bill (items, totals,
-and the recalculated payment figures). A backend can treat that as an idempotent upsert
-of the bill; the frontend already adjusts local stock by the qty delta before syncing.
+the recalculated payment figures, and the recomputed GST fields). A backend can treat that
+as an idempotent upsert of the bill; the frontend already adjusts local stock by the qty
+delta before syncing.
 
 ### `DELETE /bills/:id`
 Response `204`. Exposed via the "Delete Bill" action on the bill detail page. Also replayed
 by the sync engine if a delete was queued while offline. As with create, **do not restore
 item stock here** — the app already queues `PUT /items/:id` updates with the restored
 absolute `stockQty` for each line, so restoring server-side too would double-count.
+
+Server-side this is **archive, not destroy**: the bill and its line items (all GST fields,
+the 8-digit `billNo`, and who/when/why) are moved into a deleted-bill archive in one
+transaction. This is **additive and transparent to the frontend** — the request/response is
+unchanged (`DELETE` → `204`), the client sends nothing new (an optional `{ "reason": "…" }`
+body is accepted but the app doesn't send one), and replays stay idempotent (a second delete
+of the same id still returns `204` with no duplicate archive row).
+
+## Deleted-bill archive (additive; not used by the current frontend)
+
+These endpoints expose the archive for an audit/restore UI. They're all user-scoped and require
+the same `Authorization: Bearer <jwt>`. The current Ionic app does not call them; they don't
+change any existing behavior.
+
+An **archived bill** is the same JSON shape as a normal bill (`id` is the *original* bill id,
+`billNo`, `items[]`, all totals and GST fields) plus:
+```json
+{ "deletedAt": "ISO 8601 string", "deletedBy": "user id", "deleteReason": "string | null" }
+```
+
+### `GET /bills/deleted`
+The caller's archived bills with nested `items`, newest-deleted first. Optional query params:
+`from` / `to` (ISO instants, filter by **deletion time**), `limit` (default 100, max 500),
+`offset`. Response `200`: array of archived bills.
+
+### `GET /bills/deleted/:id`
+One archived bill (by its original id). `200` with the archived bill, or `404` if it isn't the
+caller's.
+
+### `POST /bills/deleted/:id/restore`
+Moves the archived bill back into the live tables (byte-for-byte, so totals/tax splits and the
+original `billNo` are identical) and removes it from the archive. `200` with the restored bill;
+`404` if not the caller's; `409` if a live bill with that id or `billNo` already exists.
+**Does not touch stock.**
+
+### `DELETE /bills/deleted/:id`
+Hard-purges the archived bill permanently. Response `204` (idempotent).
 
 ## Notes for the backend implementation
 

@@ -13,8 +13,10 @@
 
 Build a REST API server that the already-built frontend can talk to. The frontend is
 **offline-first**: it reads/writes a local SQLite cache and replays queued writes to this
-backend when online (network reconnect, app resume, every 30s, and after each write). The
-backend is the shared source of truth that multiple devices sync against.
+backend when online (network reconnect, app resume, every 30s, and after each write). That
+client-side cache is native SQLite on Android/iOS and `jeep-sqlite` (WASM SQLite over
+IndexedDB) on the website — the backend is unaware of it either way. The backend is the shared
+source of truth that multiple devices sync against.
 
 The app id / product context:
 - App id: `com.mystore.stationery`
@@ -124,37 +126,90 @@ CREATE TABLE IF NOT EXISTS items (
   unit            VARCHAR(16)   NOT NULL DEFAULT 'pcs',  -- pcs | box | dozen | pack
   sku             VARCHAR(80)   NULL,
   godown_location VARCHAR(160)  NULL,
+  hsn_code        VARCHAR(20)   NULL,           -- GST: HSN/SAC code (additive, nullable)
+  gst_percent     DECIMAL(5,2)  NULL,           -- GST: rate 0/5/12/18/28 (additive, nullable)
   CONSTRAINT fk_items_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS bills (
-  id             CHAR(36)      NOT NULL PRIMARY KEY,
-  bill_no        VARCHAR(40)   NOT NULL,
-  customer_name  VARCHAR(160)  NOT NULL,
-  customer_phone VARCHAR(40)   NULL,
-  date           DATETIME      NOT NULL,        -- store the client's ISO-8601 instant (UTC)
-  discount       DECIMAL(10,2) NOT NULL DEFAULT 0,   -- sum of per-line discounts
-  total          DECIMAL(10,2) NOT NULL DEFAULT 0,   -- sum of line gross subtotals
-  grand_total    DECIMAL(10,2) NOT NULL DEFAULT 0,   -- total - discount
-  payment_status VARCHAR(16)   NOT NULL DEFAULT 'paid', -- paid | pending | partial
-  amount_paid    DECIMAL(10,2) NOT NULL DEFAULT 0,
-  amount_due     DECIMAL(10,2) NOT NULL DEFAULT 0,
-  payment_method VARCHAR(16)   NULL,            -- cash | upi | cheque | null
-  cheque_no      VARCHAR(60)   NULL
+  id                CHAR(36)      NOT NULL PRIMARY KEY,
+  bill_no           VARCHAR(40)   NOT NULL,
+  customer_name     VARCHAR(160)  NOT NULL,
+  customer_phone    VARCHAR(40)   NULL,
+  date              DATETIME      NOT NULL,        -- store the client's ISO-8601 instant (UTC)
+  discount          DECIMAL(10,2) NOT NULL DEFAULT 0,   -- sum of per-line discounts
+  total             DECIMAL(10,2) NOT NULL DEFAULT 0,   -- sum of line gross subtotals
+  grand_total       DECIMAL(10,2) NOT NULL DEFAULT 0,   -- non-GST: total - discount; GST: taxable + taxes + round_off
+  payment_status    VARCHAR(16)   NOT NULL DEFAULT 'paid', -- paid | pending | partial
+  amount_paid       DECIMAL(10,2) NOT NULL DEFAULT 0,
+  amount_due        DECIMAL(10,2) NOT NULL DEFAULT 0,
+  payment_method    VARCHAR(16)   NULL,            -- cash | upi | cheque | null
+  cheque_no         VARCHAR(60)   NULL,
+  -- GST fields (all additive; a non-GST bill leaves these at their defaults)
+  is_gst_invoice    TINYINT(1)    NOT NULL DEFAULT 0,
+  gst_type          VARCHAR(10)   NOT NULL DEFAULT 'none',  -- intra | inter | none
+  seller_gstin      VARCHAR(20)   NULL,
+  seller_state_code VARCHAR(4)    NULL,
+  buyer_gstin       VARCHAR(20)   NULL,
+  buyer_state       VARCHAR(60)   NULL,
+  buyer_state_code  VARCHAR(4)    NULL,
+  taxable_amount    DECIMAL(10,2) NOT NULL DEFAULT 0,   -- = total - discount
+  sgst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+  cgst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+  igst_total        DECIMAL(10,2) NOT NULL DEFAULT 0,
+  round_off         DECIMAL(10,2) NOT NULL DEFAULT 0,   -- signed rounding to whole rupee
+  amount_in_words   VARCHAR(255)  NULL
 );
 
 CREATE TABLE IF NOT EXISTS bill_items (
-  id        BIGINT AUTO_INCREMENT PRIMARY KEY,
-  bill_id   CHAR(36)      NOT NULL,
-  item_id   CHAR(36)      NULL,                 -- may be null if the item was later deleted
-  item_name VARCHAR(160)  NOT NULL,             -- snapshot of the name at sale time
-  qty       DECIMAL(10,2) NOT NULL,
-  price     DECIMAL(10,2) NOT NULL,
-  subtotal  DECIMAL(10,2) NOT NULL,             -- qty * price (gross, before discount)
-  discount  DECIMAL(10,2) NOT NULL DEFAULT 0,   -- per-line discount amount
+  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+  bill_id       CHAR(36)      NOT NULL,
+  item_id       CHAR(36)      NULL,                 -- may be null if the item was later deleted
+  item_name     VARCHAR(160)  NOT NULL,             -- snapshot of the name at sale time
+  qty           DECIMAL(10,2) NOT NULL,
+  price         DECIMAL(10,2) NOT NULL,
+  subtotal      DECIMAL(10,2) NOT NULL,             -- qty * price (gross, before discount)
+  discount      DECIMAL(10,2) NOT NULL DEFAULT 0,   -- per-line discount amount
+  -- GST fields (additive; 0/null on non-GST lines)
+  hsn_code      VARCHAR(20)   NULL,
+  gst_percent   DECIMAL(5,2)  NOT NULL DEFAULT 0,
+  taxable_value DECIMAL(10,2) NULL,                 -- = subtotal - discount
+  sgst          DECIMAL(10,2) NOT NULL DEFAULT 0,
+  cgst          DECIMAL(10,2) NOT NULL DEFAULT 0,
+  igst          DECIMAL(10,2) NOT NULL DEFAULT 0,
   CONSTRAINT fk_bill_items_bill FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
 );
+
+-- Audit archive for deleted bills (see §6b). `deleted_bills` mirrors EVERY `bills` column plus
+-- deletion metadata; `deleted_bill_items` mirrors EVERY `bill_items` column. No UNIQUE on
+-- `bill_no` here (the same invoice number may recur over time). A future `bills` column must
+-- also be added to `deleted_bills`.
+CREATE TABLE IF NOT EXISTS deleted_bills (
+  original_bill_id  CHAR(36)      NOT NULL PRIMARY KEY,  -- the source bill's id
+  user_id           CHAR(36)      NOT NULL,
+  -- ... every other `bills` column, same names/types (bill_no, customer_*, date, discount,
+  -- total, grand_total, payment_*, cheque_no, is_gst_invoice, gst_type, seller/buyer *,
+  -- taxable_amount, sgst_total, cgst_total, igst_total, round_off, amount_in_words) ...
+  deleted_at        DATETIME      NOT NULL,
+  deleted_by        CHAR(36)      NOT NULL,               -- user id from the JWT
+  delete_reason     VARCHAR(255)  NULL,
+  INDEX idx_deleted_bills_user_deleted (user_id, deleted_at),
+  INDEX idx_deleted_bills_user_orig    (user_id, original_bill_id)
+);
+
+CREATE TABLE IF NOT EXISTS deleted_bill_items (
+  id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+  deleted_bill_id CHAR(36)      NOT NULL,
+  -- ... every `bill_items` column except id/bill_id (item_id, item_name, qty, price, subtotal,
+  -- discount, hsn_code, gst_percent, taxable_value, sgst, cgst, igst) ...
+  CONSTRAINT fk_deleted_bill_items FOREIGN KEY (deleted_bill_id) REFERENCES deleted_bills(original_bill_id) ON DELETE CASCADE
+);
 ```
+
+> **GST fields are additive & backward compatible.** All columns above added for GST are
+> nullable or defaulted, so existing rows and non-GST bills are unaffected. `grandTotal` for a
+> non-GST bill still equals `total - discount`. The frontend computes all tax values; the server
+> persists-and-echoes them (cast DECIMALs with `Number()`), and may ignore any it doesn't store.
 
 Notes:
 - **IDs are opaque strings.** Use `CHAR(36)` UUIDs (e.g. `crypto.randomUUID()`), generated by the
@@ -250,16 +305,22 @@ Bill JSON shape (returned by `GET /bills`, and the body of `POST /bills`):
 | `GET /bills`             | –                                     | 200     | Return **all** bills with their `items` array nested. Client filters by date/status/customer locally. |
 | `POST /bills`            | full bill object (see below)          | 201     | Persist bill + its line items in one transaction. **Ignore** any incoming `id`/`billNo` and assign your own; return the full bill with the server `id` and `billNo`. |
 | `PUT /bills/:id/payment` | payment patch **or** full bill        | 200     | Dual-purpose — see below. |
-| `DELETE /bills/:id`      | –                                     | 204     | Delete the bill and its `bill_items` (FK cascade). |
+| `DELETE /bills/:id`      | optional `{ reason }`                 | 204     | **Archive** the bill (move it + items to `deleted_bills`/`deleted_bill_items` in one txn), then remove from live. Idempotent on replay. See §6b. |
+| `GET /bills/deleted`     | –                                     | 200     | Caller's archived bills w/ nested `items`, newest-deleted first. Optional `from`/`to` (deletion time), `limit` (≤500), `offset`. |
+| `GET /bills/deleted/:id` | –                                     | 200/404 | One archived bill by original id (this user's). |
+| `POST /bills/deleted/:id/restore` | –                            | 200/404/409 | Move archived bill back to live tables; `409` if a live bill with that id or `bill_no` exists. Returns the restored bill. **No stock change.** |
+| `DELETE /bills/deleted/:id` | –                                  | 204     | Hard-purge from the archive. |
 
-**`POST /bills` details.** The client sends the whole bill including a *temporary* local `id`
-(`local-...`) and a placeholder `billNo` (`BILL-<timestamp>`). Do **not** trust them:
+**`POST /bills` details.** The client sends the whole bill (including the additive GST fields)
+plus a *temporary* local `id` (`local-...`) and a placeholder `billNo` (`BILL-<timestamp>`).
+Do **not** trust the client id/billNo:
 - Generate a fresh UUID `id`.
-- Generate a real, human-friendly, unique `billNo` server-side (e.g. `BILL-000123` from a
-  counter/sequence, or keep the timestamp scheme — just make it unique).
+- Assign a per-user, sequential, plain **8-digit** `billNo` (`00000001`, `00000002`, …). The
+  reference implementation's `nextBillNo` takes the largest numeric suffix across the user's
+  existing `bill_no`s (robust to any legacy `BILL-00000x` rows) and zero-pads `+1` to 8 digits.
 - Insert the bill row and one `bill_items` row per `items[]` entry, inside a transaction.
-- Respond `201` with the complete stored bill (server `id`, server `billNo`, echoed items/totals).
-  The client replaces its local id/billNo with these.
+- Respond `201` with the complete stored bill (server `id`, server `billNo`, echoed items/totals
+  including the GST columns). The client replaces its local id/billNo with these on sync.
 
 **`PUT /bills/:id/payment` is dual-purpose.** The client's sync engine replays two different
 "update bill" cases through this one endpoint:
@@ -296,6 +357,27 @@ create, stock would be reduced twice (once by the item PUT, once by the bill POS
 
 (If you later want the server to be authoritative for stock instead, that's a bigger design change
 and would require the client to stop sending absolute stock — out of scope for v1.)
+
+## 6b. Deleted bill archive (archive, don't destroy)
+
+`DELETE /bills/:id` must **preserve** the record, not drop it. In one transaction: read the bill +
+its items (scoped to `req.user.id`), `INSERT … SELECT` them into `deleted_bills` /
+`deleted_bill_items` (copying every column incl. all GST fields and the 8-digit `bill_no`, plus
+`deleted_at`, `deleted_by` = the JWT user, and optional `delete_reason` from the body), then delete
+from the live tables. Roll back on any error. Keep the `204` response — the frontend is unchanged.
+
+Rules:
+- **Idempotent.** The sync queue can replay a delete. If there's no live bill for that id (already
+  archived, or never existed), return `204` without inserting a duplicate archive row
+  (`deleted_bills.original_bill_id` is the PK).
+- **Multi-tenant.** Every archive read/insert/restore/purge filters on `user_id = req.user.id`.
+- **Stock-neutral.** Neither delete nor restore touches `items.stock_qty` (§6 still holds).
+- **Restore** (`POST /bills/deleted/:id/restore`) is the transactional inverse; `409` if a live
+  bill with that id or `bill_no` already exists. Use `INSERT … SELECT` so totals/tax splits and the
+  original `bill_no` come back byte-for-byte.
+
+This is **additive** — it introduces the two archive tables and the four `/bills/deleted…`
+endpoints without changing any existing request/response, so the shipped frontend needs no changes.
 
 ## 7. Auth & seeding details
 

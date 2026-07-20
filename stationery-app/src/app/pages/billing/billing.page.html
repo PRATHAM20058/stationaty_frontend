@@ -151,6 +151,28 @@
             </div>
           </ion-item>
         }
+        @if (isGstInvoice) {
+          <ion-item class="gst-line-editor" lines="none">
+            <ion-input
+              label="HSN"
+              labelPlacement="stacked"
+              placeholder="e.g. 9608"
+              inputmode="numeric"
+              [(ngModel)]="line.hsnCode"
+            ></ion-input>
+            <ion-select
+              label="GST %"
+              labelPlacement="stacked"
+              placeholder="Select"
+              [(ngModel)]="line.gstPercent"
+              slot="end"
+            >
+              @for (g of gstOptions; track g) {
+                <ion-select-option [value]="g">{{ g }}%</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+        }
       }
     </ion-list>
   }
@@ -165,12 +187,50 @@
     <ion-input [(ngModel)]="customerPhone" type="tel" appEnterNext></ion-input>
   </ion-item>
 
+  <ion-item class="gst-toggle ion-margin-bottom" lines="none">
+    <ion-toggle [(ngModel)]="isGstInvoice">GST Invoice</ion-toggle>
+  </ion-item>
+
+  @if (isGstInvoice) {
+    <ion-item fill="outline" class="ion-margin-bottom">
+      <ion-label position="stacked">Buyer GSTIN (optional)</ion-label>
+      <ion-input [(ngModel)]="buyerGstin" placeholder="e.g. 24ABCDE1234F1Z5" appEnterNext></ion-input>
+    </ion-item>
+    <ion-item fill="outline" class="ion-margin-bottom">
+      <ion-label position="stacked">Buyer State (optional)</ion-label>
+      <ion-input [(ngModel)]="buyerState" placeholder="e.g. Gujarat" appEnterNext></ion-input>
+    </ion-item>
+    <ion-item fill="outline" class="ion-margin-bottom">
+      <ion-label position="stacked">Buyer State Code</ion-label>
+      <ion-input [(ngModel)]="buyerStateCode" inputmode="numeric" placeholder="e.g. 24 (same as seller = intra-state)" appEnterNext></ion-input>
+    </ion-item>
+    @if (hasUnsetGst) {
+      <p class="due-line">Pick a GST % for every cart item to generate the invoice.</p>
+    }
+  }
+
   <div class="totals">
     <div class="totals-row"><span>Total</span><span>₹{{ total | number: '1.0-2' }}</span></div>
     @if (totalDiscount > 0) {
       <div class="totals-row"><span>Item discounts</span><span>-₹{{ totalDiscount | number: '1.0-2' }}</span></div>
     }
+    @if (isGstInvoice) {
+      <div class="totals-row"><span>Taxable Amount</span><span>₹{{ gst.taxableAmount | number: '1.2-2' }}</span></div>
+      @if (gst.gstType === 'intra') {
+        <div class="totals-row"><span>SGST</span><span>₹{{ gst.sgstTotal | number: '1.2-2' }}</span></div>
+        <div class="totals-row"><span>CGST</span><span>₹{{ gst.cgstTotal | number: '1.2-2' }}</span></div>
+      }
+      @if (gst.gstType === 'inter') {
+        <div class="totals-row"><span>IGST</span><span>₹{{ gst.igstTotal | number: '1.2-2' }}</span></div>
+      }
+      @if (gst.roundOff !== 0) {
+        <div class="totals-row"><span>Round Off</span><span>{{ gst.roundOff > 0 ? '+' : '' }}₹{{ gst.roundOff | number: '1.2-2' }}</span></div>
+      }
+    }
     <div class="totals-row grand"><span>Grand Total</span><span>₹{{ grandTotal | number: '1.0-2' }}</span></div>
+    @if (isGstInvoice) {
+      <div class="amount-words">{{ gst.amountInWords }}</div>
+    }
   </div>
 
   <h3 class="section-title">Payment</h3>

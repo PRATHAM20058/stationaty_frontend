@@ -58,6 +58,23 @@
     </div>
 
     <ion-item fill="outline" class="ion-margin-bottom">
+      <ion-label position="stacked">HSN Code (optional)</ion-label>
+      <ion-input formControlName="hsnCode" placeholder="e.g. 9608" inputmode="numeric" appEnterNext></ion-input>
+    </ion-item>
+
+    <ion-item fill="outline" class="ion-margin-bottom">
+      <ion-label position="stacked">GST % (optional)</ion-label>
+      <ion-select formControlName="gstPercent" placeholder="Select GST rate" appEnterNext appTypeaheadSelect>
+        @for (g of gstOptions; track g) {
+          <ion-select-option [value]="g">{{ g }}%</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+    <ion-text color="medium">
+      <p class="hint">HSN &amp; GST% are used when generating a GST tax invoice. Leave blank for non-GST items.</p>
+    </ion-text>
+
+    <ion-item fill="outline" class="ion-margin-bottom">
       <ion-label position="stacked">Godown Location</ion-label>
       <ion-input formControlName="godownLocation" placeholder="e.g. Rack 3, Shelf B" appEnterNext></ion-input>
     </ion-item>

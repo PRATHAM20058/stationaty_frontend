@@ -25,7 +25,7 @@ import { qrCodeOutline } from 'ionicons/icons';
 import { ItemService } from '../../../core/services/item.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { Category } from '../../../core/models/category.model';
-import { ItemUnit } from '../../../core/models/item.model';
+import { ItemUnit, GST_PERCENT_OPTIONS } from '../../../core/models/item.model';
 import { BarcodeScannerModalComponent } from '../../../shared/components/barcode-scanner-modal/barcode-scanner-modal.component';
 import { EnterNextDirective } from '../../../shared/directives/enter-next.directive';
 import { SelectTypeaheadDirective } from '../../../shared/directives/select-typeahead.directive';
@@ -61,6 +61,7 @@ export class ItemFormPage implements OnInit {
   isEdit = false;
   itemId: string | null = null;
   units: ItemUnit[] = ['pcs', 'box', 'dozen', 'pack'];
+  gstOptions = GST_PERCENT_OPTIONS;
 
   // Number fields start empty (not a prefilled 0 the user has to clear first);
   // edit mode patches the real values in ngOnInit.
@@ -73,6 +74,8 @@ export class ItemFormPage implements OnInit {
     unit: ['pcs' as ItemUnit, [Validators.required]],
     sku: [''],
     godownLocation: [''],
+    hsnCode: [''],
+    gstPercent: [null as number | null],
   });
 
   constructor(
@@ -103,6 +106,8 @@ export class ItemFormPage implements OnInit {
           unit: item.unit,
           sku: item.sku ?? '',
           godownLocation: item.godownLocation ?? '',
+          hsnCode: item.hsnCode ?? '',
+          gstPercent: item.gstPercent ?? null,
         });
       }
     }
@@ -138,6 +143,8 @@ export class ItemFormPage implements OnInit {
       unit: raw.unit as ItemUnit,
       sku: raw.sku || undefined,
       godownLocation: raw.godownLocation || undefined,
+      hsnCode: raw.hsnCode || null,
+      gstPercent: raw.gstPercent === null || raw.gstPercent === undefined ? null : Number(raw.gstPercent),
     };
 
     if (this.isEdit && this.itemId) {

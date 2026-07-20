@@ -16,15 +16,29 @@ server is unreachable.
   `@capacitor-mlkit/barcode-scanning` with a "choose from gallery" fallback.
 - **Payment methods** — Cash, UPI, or Cheque. Choosing Cheque reveals an optional
   Cheque No. field that can also be added/edited later from the bill's detail page.
-- **Items & inventory** — CRUD with category filter, low-stock badges, SKU, and a free-text
-  godown/storage location that search also matches against.
+- **Items & inventory** — CRUD with category filter, low-stock badges, SKU, an optional
+  **HSN code + GST %** (0/5/12/18/28) per item, and a free-text godown/storage location
+  that search also matches against.
+- **GST tax invoices** — a **GST Invoice** toggle on the billing screen turns a bill into a
+  proper GST tax invoice. It computes SGST/CGST (intra-state) or IGST (inter-state) on each
+  line's discount-net value, rounds the grand total to the nearest rupee (with a signed
+  round-off), and prints an "amount in words" (Indian lakh/crore). Non-GST bills behave
+  exactly as before — every GST field is optional and defaults so legacy bills are unchanged.
+  Buyer State/Code left blank defaults to the seller's own (Gujarat / 24 ⇒ intra-state).
+- **Business / GST profile** — the shop's own identity (business name, address, GSTIN, PAN,
+  state code, bank details, mobiles) is edited on the **Settings** page and stored locally via
+  Capacitor Preferences (`SellerConfigService`); it feeds the tax calculation and the invoice.
 - **Bills** — history with date + status filters, per-bill detail with edit-items,
-  record-payment, share/print PDF, and delete.
+  record-payment, share/print PDF, and delete. Server-synced bills carry a plain, sequential
+  **8-digit invoice number** (`00000001`, `00000002`, …); the detail page swaps the offline
+  placeholder for the real number automatically once the create syncs.
+- **PDF invoice** — `PdfService` (pdfmake) produces either the simple receipt (non-GST) or a
+  bordered A4 **GST tax invoice** (HSN, per-line SGST/CGST/IGST, totals ledger, bank block,
+  declarations) shared via the native share sheet on Android or downloaded on web.
 - **Reports** — daily sales chart plus Top Selling, Low Selling, and Low Stock lists,
   scoped by a Last 7 Days / Last 30 Days toggle.
 - **Offline-first** — every read is served from a local SQLite cache and every write is
   queued and replayed to the backend when connectivity returns (see below).
-- Company name + GSTIN (set in the environment files) are printed on every generated bill.
 
 ## Requirements
 
@@ -45,9 +59,20 @@ npm install
 ionic serve
 ```
 
-Opens the app at `http://localhost:8100`. On web, the local database is backed by
-`jeep-sqlite` (a wasm SQLite running over IndexedDB), so offline-first behavior works
-in the browser too.
+Opens the app at `http://localhost:8100`.
+
+**Local database engine (web vs native).** The app keeps a local SQLite mirror for its
+offline-first behavior, and the **same `SqliteService`** picks the engine by platform:
+
+- **Website / browser (`ionic serve`, web build):** uses **`jeep-sqlite`** — a WebAssembly
+  build of SQLite persisted to **IndexedDB**. This is what makes offline-first work in the
+  browser. It's selected at runtime in `SqliteService.init()` when
+  `Capacitor.getPlatform() === 'web'`, and writes are flushed to IndexedDB via `saveToStore`.
+- **Android / iOS (native app):** uses the **native `@capacitor-community/sqlite`** engine
+  (real on-device SQLite). `jeep-sqlite`/WASM is **not** used on native.
+
+Because `jeep-sqlite` is web-only, anything about the WASM (the `sql-wasm.wasm` asset, the
+version note below) affects **only the website**, never the packaged Android/iOS app.
 
 ## Pointing at your backend
 
@@ -62,10 +87,11 @@ export const environment = {
   production: true,
   apiUrl: 'https://mystore.duckdns.org/api',
   lowStockThreshold: 5,
-  // Printed on every bill / invoice PDF.
+  // Seed company details. The full GST seller profile (address, state code, bank, etc.) is
+  // editable in the app's Settings page and persisted via SellerConfigService.
   company: {
     name: 'Shree Sales Agency',
-    gstNo: '24AABCS1234K1Z9',
+    gstNo: '24AIVPR6534P1Z8',
   },
 };
 ```
@@ -117,14 +143,45 @@ brew install --cask temurin@21
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 ```
 
+### Troubleshooting: web login stuck / `jeep-sqlite` WASM `LinkError`
+
+This only affects the **website** (`ionic serve` / web build) — the native Android/iOS app
+uses native SQLite and is never impacted.
+
+The web SQLite engine is `jeep-sqlite`, which loads the SQLite WASM binary from
+`src/assets/sql-wasm.wasm`. That file **must match the sql.js version whose JS glue is baked
+into the installed `jeep-sqlite`**. If they differ you get, on load:
+
+```
+LinkError: WebAssembly.instantiate() … "I": function import requires a callable
+```
+
+jeep-sqlite aborts, the browser database never initializes, and the app **hangs on the login
+screen after Sign In** (the login request itself may even succeed on the network).
+
+**Fix — keep the wasm aligned with jeep-sqlite's sql.js:**
+`jeep-sqlite@2.8.0` (published 2024-08-16) bakes sql.js **1.11.0**, so serve sql.js 1.11.0's
+wasm:
+
+```bash
+# grab the matching wasm and drop it into assets
+npm pack sql.js@1.11.0 && tar -xzf sql.js-1.11.0.tgz
+cp package/dist/sql-wasm.wasm src/assets/sql-wasm.wasm   # md5 f6ad6454…, 652953 bytes
+```
+
+Note: `src/assets/sql-wasm.wasm` is a **hand-placed** file (not auto-copied from
+`node_modules/sql.js`, which may be a newer, incompatible version). If you ever bump
+`jeep-sqlite`, re-copy the wasm from the sql.js version that release was built against.
+
 ## Project structure
 
 ```
 src/app/
   core/
-    models/        # Category, Item, Bill, User, sync types
+    models/        # Category, Item, Bill, User, SellerConfig, sync types
     services/       # Auth, UserStore, DemoSeed, Category, Item, Billing, Sync,
-                     # Sqlite, Pdf, SyncTrigger
+                     # Sqlite, Pdf, SyncTrigger, SellerConfig
+    utils/          # gst.util (calcGstBill, numberToWordsIndian, round2) + its spec
     interceptors/    # JWT attach + 401 -> logout/login redirect
     guards/          # authGuard for protected routes
   pages/
@@ -138,11 +195,30 @@ src/app/
 
 Dashboard, Items, Billing, Reports, and Bills (bill history) are the bottom tabs.
 Categories and Settings — plus Logout — are reachable from the side menu (`ion-menu`).
+The **Settings** page also hosts the editable **Business / GST profile** used for tax invoices.
+
+## GST invoicing
+
+The GST feature is additive and backward-compatible — a non-GST bill computes and prints
+identically to before. Key pieces:
+
+- `core/utils/gst.util.ts` — `calcGstBill(bill, seller)` (pure tax computation) and
+  `numberToWordsIndian(n)`, covered by `gst.util.spec.ts` (run with `npm test`).
+- `core/services/seller-config.service.ts` — the shop's GST/business identity, edited in
+  Settings and stored in Capacitor Preferences.
+- Item form gains **HSN Code** + **GST %**; the Billing screen gains a **GST Invoice** toggle
+  (buyer GSTIN/State/Code + live per-line and total tax); `PdfService` renders the bordered
+  A4 tax invoice.
+
+All GST fields travel inside the existing `POST /bills` / `PUT /items/:id` bodies (no new
+endpoints), and stock stays client-authoritative. See `API_CONTRACT.md` / `BACKEND_PROMPT.md`
+for the additive field list.
 
 ## Offline-first behavior
 
 - All reads (items, categories, bills, dashboard, billing search) come from a local
-  SQLite cache first, so the UI is instant and fully usable offline.
+  SQLite cache first, so the UI is instant and fully usable offline. That cache is native
+  SQLite on device and `jeep-sqlite` (WASM SQLite over IndexedDB) on the website.
 - Every create/update/delete writes to SQLite immediately and queues a row in a local
   `sync_queue` table.
 - `SyncService` drains that queue whenever the app is online — on network reconnect,
@@ -155,14 +231,13 @@ Categories and Settings — plus Logout — are reachable from the side menu (`i
 
 ## Login
 
-There's no backend yet, so auth runs entirely on-device: accounts live in a local
-SQLite `auth_users` table, seeded on first launch with `admin` / `admin123`. New
-accounts can also be created from the **Sign Up** page (`/signup`), which creates a
-local account and signs you straight in — no server call involved.
+Auth is local-first: accounts live in a local SQLite `auth_users` table, seeded on first
+launch with `admin` / `admin123`. New accounts can also be created from the **Sign Up** page
+(`/signup`), which creates a local account and signs you straight in — no server call involved.
 
-`POST /auth/login` is only called as a fallback when a username isn't found locally,
-so it will fail until you build a backend matching `API_CONTRACT.md` (see `BACKEND_PROMPT.md`
-for a ready-to-build spec). Once one exists,
-logging in with a username that isn't a local account will hit it transparently.
-Everything else in the app (browsing cached items, offline billing, etc.) is designed
-to keep working regardless of backend availability once a session exists.
+A matching backend now lives in [`backend/`](./backend) (Node.js + Express + MySQL; see its
+[`README.md`](./backend/README.md)). `POST /auth/login` is called as a fallback when a username
+isn't found locally, so logging in with a server-only account hits it transparently once the
+backend is running and `environment.apiUrl` points at it. Everything else in the app (browsing
+cached items, offline billing, etc.) keeps working regardless of backend availability once a
+session exists.

@@ -65,6 +65,8 @@ export class PendingBillsPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.load();
+    // Pull the latest bills from the backend, then re-render (offline-safe: ignore failures).
+    this.billingService.refreshFromServer().then(() => this.load()).catch(() => {});
     // The bill detail page opens as a top-level route over the tabs shell, so returning
     // from it does not always re-fire ionViewWillEnter here. Subscribe to bill changes
     // so a recorded payment / edit is reflected in this list right away.

@@ -5,8 +5,7 @@ import { Preferences } from '@capacitor/preferences';
 import { jwtDecode } from 'jwt-decode';
 import { environment } from '../../../environments/environment';
 import { User } from '../models/user.model';
-import { DemoSeedService } from './demo-seed.service';
-import { UserStoreService, StoredUser } from './user-store.service';
+import { SqliteService } from './sqlite.service';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -30,8 +29,7 @@ export class AuthService {
 
   constructor(
     private http: HttpClient,
-    private demoSeed: DemoSeedService,
-    private userStore: UserStoreService,
+    private sqlite: SqliteService,
   ) {
     this.restored = this.restoreSession();
   }
@@ -56,59 +54,39 @@ export class AuthService {
   }
 
   /**
-   * No backend yet, so accounts (including the seeded admin/admin123) live in a
-   * local SQLite table. A username not found locally falls through to the real
-   * backend call, so this keeps working once a server is plugged in.
+   * Authenticates against the backend, which is the source of truth for accounts and issues a
+   * signed JWT. Data is per-user on the server, so we wipe the local (per-device) cache on every
+   * sign-in — otherwise the previous user's cached rows would show until the next refresh.
    */
   async login(username: string, password: string): Promise<User> {
-    await this.userStore.ensureSeeded();
-
-    const knownLocally = await this.userStore.findByUsername(username);
-    if (knownLocally) {
-      const verified = await this.userStore.verifyPassword(username, password);
-      if (!verified) {
-        throw { status: 401 };
-      }
-      return this.completeLocalLogin(verified);
-    }
-
     const res = await firstValueFrom(
       this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, { username, password }),
     );
+    return this.establishSession(res);
+  }
+
+  /** Creates a new account on the backend and signs the user straight in (empty store). */
+  async signup(name: string, username: string, password: string): Promise<User> {
+    const res = await firstValueFrom(
+      this.http.post<LoginResponse>(`${environment.apiUrl}/auth/signup`, { name, username, password }),
+    );
+    return this.establishSession(res);
+  }
+
+  /** Persists the session token/user and clears any cached data left by a previous account. */
+  private async establishSession(res: LoginResponse): Promise<User> {
+    await this.sqlite.clearUserData();
     await Preferences.set({ key: TOKEN_KEY, value: res.token });
     await Preferences.set({ key: 'auth_user', value: JSON.stringify(res.user) });
     this.currentUserSubject.next(res.user);
     return res.user;
   }
 
-  /** Creates a new local account and signs the user straight in. */
-  async signup(name: string, username: string, password: string): Promise<User> {
-    await this.userStore.ensureSeeded();
-    const created = await this.userStore.createUser(name, username, password);
-    return this.completeLocalLogin(created);
-  }
-
-  /** Signs a locally-verified user in (no HTTP call) and seeds sample data so the app is explorable. */
-  private async completeLocalLogin(storedUser: StoredUser): Promise<User> {
-    const user: User = { id: storedUser.id, name: storedUser.name, role: storedUser.role };
-    const token = this.buildFakeToken(storedUser.id);
-    await Preferences.set({ key: TOKEN_KEY, value: token });
-    await Preferences.set({ key: 'auth_user', value: JSON.stringify(user) });
-    this.currentUserSubject.next(user);
-    await this.demoSeed.seedIfEmpty();
-    return user;
-  }
-
-  private buildFakeToken(subject: string): string {
-    const base64url = (obj: unknown) => btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const header = base64url({ alg: 'none', typ: 'JWT' });
-    const payload = base64url({ sub: subject, exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60 });
-    return `${header}.${payload}.local-signature`;
-  }
-
   async logout(): Promise<void> {
     await Preferences.remove({ key: TOKEN_KEY });
     await Preferences.remove({ key: 'auth_user' });
+    // Drop the cached data so it can't be seen by whoever signs in next on this device.
+    await this.sqlite.clearUserData();
     this.currentUserSubject.next(null);
   }
 

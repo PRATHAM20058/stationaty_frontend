@@ -19,13 +19,14 @@ I want to build the frontend for a **Stationery Shop Management System** using *
 ### 2. Data Models (TypeScript interfaces)
 Create interfaces matching this schema:
 - `Category { id, name }`
-- `Item { id, name, categoryId, category?, purchasePrice, sellingPrice, stockQty, unit, sku?, godownLocation? }`
-- `BillItem { itemId, itemName, qty, price, subtotal, discount }` — discount is applied per line item (amount or %, converted to a monetary value), not just as a single bill-wide figure
-- `Bill { id, billNo, customerName, customerPhone?, date, items: BillItem[], discount, total, grandTotal, paymentStatus ('paid' | 'pending' | 'partial'), amountPaid, amountDue, paymentMethod? ('cash' | 'upi' | 'cheque' | null), chequeNo? }` — `discount` is the sum of each line's discount, `total` is the sum of gross line subtotals, `grandTotal = total - discount`; `chequeNo` is an optional free-text field only meaningful when `paymentMethod` is `cheque` (and can be filled in after the bill is created)
+- `Item { id, name, categoryId, category?, purchasePrice, sellingPrice, stockQty, unit, sku?, godownLocation?, hsnCode?, gstPercent? }` — `hsnCode` and `gstPercent` (0/5/12/18/28) are optional GST fields
+- `BillItem { itemId, itemName, qty, price, subtotal, discount, hsnCode?, gstPercent?, taxableValue?, sgst?, cgst?, igst? }` — discount is applied per line item (amount or %, converted to a monetary value), not just as a single bill-wide figure; the GST fields are 0/absent on non-GST bills
+- `Bill { id, billNo, customerName, customerPhone?, date, items: BillItem[], discount, total, grandTotal, paymentStatus ('paid' | 'pending' | 'partial'), amountPaid, amountDue, paymentMethod? ('cash' | 'upi' | 'cheque' | null), chequeNo?, isGstInvoice?, gstType? ('intra'|'inter'|'none'), sellerGstin?, sellerStateCode?, buyerGstin?, buyerState?, buyerStateCode?, taxableAmount?, sgstTotal?, cgstTotal?, igstTotal?, roundOff?, amountInWords? }` — `discount` is the sum of each line's discount, `total` is the sum of gross line subtotals; for a non-GST bill `grandTotal = total - discount`, for a GST invoice `grandTotal = taxableAmount + sgstTotal + cgstTotal + igstTotal + roundOff` (rounded to the nearest rupee); `chequeNo` is optional free-text only meaningful when `paymentMethod` is `cheque`
+- `SellerConfig { businessName, subtitle, address, sellerGstin, pan, mobiles[], sellerState, sellerStateCode, bankName, bankAccountNo, ifsc }` — the shop's own GST/business identity, edited in Settings and stored via Capacitor Preferences
 - `User { id, name, role }`
 
 ### 3. Core Services (Angular injectable services, using HttpClient + RxJS)
-- `AuthService` — login, signup, logout, token storage via Capacitor Preferences, current user state (BehaviorSubject). Since there's no backend yet, accounts are validated against a local SQLite `auth_users` table (seeded with `admin`/`admin123`, passwords SHA-256 hashed); a username not found locally falls through to a real `POST /auth/login` call so this keeps working once a backend exists
+- `AuthService` — login, signup, logout, token storage via Capacitor Preferences, current user state (BehaviorSubject). Auth is local-first: accounts are validated against a local SQLite `auth_users` table (seeded with `admin`/`admin123`, passwords SHA-256 hashed); a username not found locally falls through to a real `POST /auth/login` call against the backend (see `backend/`)
 - `CategoryService` — CRUD for categories
 - `ItemService` — CRUD for items, search/filter by name or category, low-stock query
 - `BillingService` — create bill, get bill by id, list bills with date filter, get today's sales summary, list bills by payment status (paid/pending/partial), mark a pending bill as paid, record partial payment
@@ -108,6 +109,7 @@ Build a proper **local-first sync system**, not just a cache:
 
 **Local storage**
 - Use `@capacitor-community/sqlite` (preferred over Preferences here, since we need to query/filter items and bills locally, not just store blobs)
+- Engine per platform (same service, chosen at runtime): the **native SQLite** engine on Android/iOS, and **`jeep-sqlite`** (a WebAssembly SQLite persisted to IndexedDB) on the **website/web build**, so offline-first works in the browser too. On web, register the `jeep-sqlite` element and `initWebStore()`/`saveToStore()`; the WASM binary (`src/assets/sql-wasm.wasm`) must match the sql.js version baked into the installed `jeep-sqlite` (a mismatch throws a WASM `LinkError` and breaks the web DB only)
 - Mirror the same tables locally as on the server: `categories`, `items`, `bills`, `bill_items`
 - On every successful API fetch (items, categories, bills), overwrite the local SQLite cache with the latest server data
 - All reads (item list, category list, dashboard, billing search) should always read from local SQLite first, so the UI is instant and works with zero internet
@@ -135,6 +137,29 @@ Build a proper **local-first sync system**, not just a cache:
 - On the Bill History and Items list, mark any not-yet-synced records with a small "pending sync" tag so the shop owner knows that bill/item hasn't reached the server yet
 
 This means: if the home server or internet drops for hours, the shop can keep billing customers and adding items normally on the tablet/phone, and everything quietly uploads once connectivity returns — no data loss, no blocking.
+
+### 7b. GST invoicing (additive, backward-compatible)
+The app can issue proper **GST tax invoices**. Every GST field is optional and defaults so a
+non-GST bill computes and prints exactly as before, and legacy data is unaffected.
+- **Settings** — a **Business / GST profile** form editing `SellerConfig` (business name,
+  address, GSTIN, PAN, state code, bank details, mobiles), persisted via Capacitor Preferences
+  (`SellerConfigService`). This is the single source of truth for the seller identity and for
+  deciding intra- vs inter-state tax.
+- **Item form** — add **HSN Code** and **GST %** (dropdown 0/5/12/18/28) fields.
+- **Billing** — a **GST Invoice** toggle. When on, reveal buyer GSTIN / State / State Code
+  (blank defaults to the seller's own ⇒ intra-state), show per-line HSN + GST % + computed
+  tax, and a totals block (Taxable, SGST, CGST, IGST, Round Off, Grand Total, Amount in Words)
+  computed live. A pure helper `calcGstBill(bill, seller)` does the math: per line
+  `taxableValue = subtotal - discount`; intra-state ⇒ SGST = CGST = half-rate, inter-state ⇒
+  IGST = full-rate; grand total rounds to the nearest rupee with a signed `roundOff`.
+  `numberToWordsIndian(n)` renders the "amount in words" (lakh/crore).
+- **Invoice** — `PdfService` (pdfmake) renders a bordered A4 GST tax invoice (HSN column,
+  per-line SGST/CGST/IGST, totals ledger, bank block, declarations) for GST bills, and the
+  simple receipt for non-GST bills. Date is `DD/MM/YYYY`; the invoice number is the server's
+  plain 8-digit sequence.
+- **Transport** — all GST fields ride inside the existing `POST /bills` and `PUT /items/:id`
+  bodies (no new endpoints); stock stays client-authoritative; the server assigns the id and an
+  8-digit `billNo`.
 
 ### 8. Forms & Validation
 - Use Angular Reactive Forms for all Add/Edit forms

@@ -21,6 +21,9 @@ import {
   IonSegment,
   IonSegmentButton,
   IonChip,
+  IonToggle,
+  IonSelect,
+  IonSelectOption,
   ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
@@ -29,21 +32,27 @@ import { addOutline, removeOutline, trashOutline, timeOutline, pricetagOutline, 
 import { ItemService } from '../../core/services/item.service';
 import { BillingService } from '../../core/services/billing.service';
 import { CategoryService } from '../../core/services/category.service';
-import { Item } from '../../core/models/item.model';
+import { SellerConfigService } from '../../core/services/seller-config.service';
+import { Item, GST_PERCENT_OPTIONS } from '../../core/models/item.model';
 import { Category } from '../../core/models/category.model';
 import { BillItem, PaymentMethod, PaymentStatus } from '../../core/models/bill.model';
+import { SellerConfig, DEFAULT_SELLER_CONFIG } from '../../core/models/seller-config.model';
+import { calcGstBill, GstBillResult } from '../../core/utils/gst.util';
 import { EnterNextDirective } from '../../shared/directives/enter-next.directive';
 import { BarcodeScannerModalComponent } from '../../shared/components/barcode-scanner-modal/barcode-scanner-modal.component';
 
 type DiscountMode = 'amount' | 'percent';
 
 /** A cart line plus the UI-only state for its per-item discount editor. */
-interface CartLine extends BillItem {
+interface CartLine extends Omit<BillItem, 'gstPercent'> {
   discountMode: DiscountMode;
   /** Raw value the user typed -- rupees if discountMode is 'amount', a percent number if 'percent'.
       Starts empty (null) so the user never has to clear a prefilled 0. */
   discountInput: number | null;
   discountOpen: boolean;
+  /** Per-line GST rate; starts from the item's saved rate, null until chosen. */
+  gstPercent: number | null;
+  hsnCode: string | null;
 }
 
 @Component({
@@ -71,6 +80,9 @@ interface CartLine extends BillItem {
     IonSegment,
     IonSegmentButton,
     IonChip,
+    IonToggle,
+    IonSelect,
+    IonSelectOption,
     EnterNextDirective,
   ],
 })
@@ -86,6 +98,14 @@ export class BillingPage implements OnInit {
 
   customerName = '';
   customerPhone = '';
+
+  // --- GST invoice state ---
+  isGstInvoice = false;
+  buyerGstin = '';
+  buyerState = '';
+  buyerStateCode = '';
+  gstOptions = GST_PERCENT_OPTIONS;
+  seller: SellerConfig = DEFAULT_SELLER_CONFIG;
 
   paymentStatus: PaymentStatus = 'paid';
   paymentMethod: PaymentMethod = 'cash';
@@ -103,6 +123,7 @@ export class BillingPage implements OnInit {
     private itemService: ItemService,
     private billingService: BillingService,
     private categoryService: CategoryService,
+    private sellerConfig: SellerConfigService,
     private router: Router,
     private toastController: ToastController,
     private modalController: ModalController,
@@ -111,6 +132,7 @@ export class BillingPage implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    this.seller = await this.sellerConfig.get();
     await this.refreshPendingCount();
     await this.loadCategories();
     // Recording a payment / marking a bill paid happens on the pending-bills and bill-detail
@@ -121,6 +143,8 @@ export class BillingPage implements OnInit {
   }
 
   async ionViewWillEnter(): Promise<void> {
+    // Pick up any edits made on the Settings page (GSTIN, state code, etc.).
+    this.seller = await this.sellerConfig.get();
     await this.refreshPendingCount();
     await this.loadCategories();
   }
@@ -209,6 +233,8 @@ export class BillingPage implements OnInit {
         discountMode: 'amount',
         discountInput: null,
         discountOpen: false,
+        gstPercent: item.gstPercent ?? null,
+        hsnCode: item.hsnCode ?? null,
       });
     }
     this.searchTerm = '';
@@ -264,8 +290,27 @@ export class BillingPage implements OnInit {
     return this.cart.reduce((sum, l) => sum + l.discount, 0);
   }
 
+  /** Live GST computation for the current cart, using the loaded seller config. */
+  get gst(): GstBillResult {
+    return calcGstBill(
+      {
+        isGstInvoice: this.isGstInvoice,
+        // Mirror generateBill's default so live totals match the saved bill (blank => intra-state).
+        buyerStateCode: this.buyerStateCode.trim() || '24',
+        items: this.cart.map((l) => ({ subtotal: l.subtotal, discount: l.discount, gstPercent: l.gstPercent })),
+      },
+      this.seller,
+    );
+  }
+
   get grandTotal(): number {
+    if (this.isGstInvoice) return this.gst.grandTotal;
     return Math.max(0, this.total - this.totalDiscount);
+  }
+
+  /** True while GST mode is on but some cart line still has no GST rate chosen. */
+  get hasUnsetGst(): boolean {
+    return this.isGstInvoice && this.cart.some((l) => l.gstPercent === null || l.gstPercent === undefined);
   }
 
   get amountPaid(): number {
@@ -282,6 +327,7 @@ export class BillingPage implements OnInit {
     if (this.cart.length === 0) return false;
     if (this.paymentStatus !== 'paid' && !this.customerName.trim()) return false;
     if (this.paymentStatus === 'partial' && (this.partialAmountReceived ?? 0) <= 0) return false;
+    if (this.hasUnsetGst) return false;
     return true;
   }
 
@@ -296,6 +342,8 @@ export class BillingPage implements OnInit {
         price: l.price,
         subtotal: l.subtotal,
         discount: l.discount,
+        hsnCode: l.hsnCode,
+        gstPercent: l.gstPercent ?? 0,
       }));
 
       const bill = await this.billingService.createBill({
@@ -308,6 +356,11 @@ export class BillingPage implements OnInit {
         amountDue: this.amountDue,
         paymentMethod: this.paymentStatus === 'pending' ? null : this.paymentMethod,
         chequeNo: this.paymentMethod === 'cheque' ? this.chequeNo.trim() || undefined : undefined,
+        isGstInvoice: this.isGstInvoice,
+        buyerGstin: this.isGstInvoice ? this.buyerGstin.trim() || null : null,
+        // Default a blank buyer state/code to the seller's own (Gujarat / 24) => intra-state.
+        buyerState: this.isGstInvoice ? this.buyerState.trim() || 'Gujarat' : null,
+        buyerStateCode: this.isGstInvoice ? this.buyerStateCode.trim() || '24' : null,
       });
 
       const toast = await this.toastController.create({ message: `Bill ${bill.billNo} generated`, duration: 1800, color: 'success' });
@@ -328,6 +381,10 @@ export class BillingPage implements OnInit {
     this.paymentMethod = 'cash';
     this.partialAmountReceived = null;
     this.chequeNo = '';
+    this.isGstInvoice = false;
+    this.buyerGstin = '';
+    this.buyerState = '';
+    this.buyerStateCode = '';
   }
 
   goToPendingBills(): void {

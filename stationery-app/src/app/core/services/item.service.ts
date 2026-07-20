@@ -110,13 +110,14 @@ export class ItemService implements SyncableEntityService {
 
   private async upsertLocal(item: Item, pendingSync: boolean): Promise<void> {
     await this.sqlite.run(
-      `INSERT INTO items (id, name, category_id, category, purchase_price, selling_price, stock_qty, unit, sku, godown_location, pending_sync)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO items (id, name, category_id, category, purchase_price, selling_price, stock_qty, unit, sku, godown_location, hsn_code, gst_percent, pending_sync)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name, category_id = excluded.category_id, category = excluded.category,
          purchase_price = excluded.purchase_price, selling_price = excluded.selling_price,
          stock_qty = excluded.stock_qty, unit = excluded.unit, sku = excluded.sku,
-         godown_location = excluded.godown_location, pending_sync = excluded.pending_sync`,
+         godown_location = excluded.godown_location, hsn_code = excluded.hsn_code,
+         gst_percent = excluded.gst_percent, pending_sync = excluded.pending_sync`,
       [
         item.id,
         item.name,
@@ -128,6 +129,8 @@ export class ItemService implements SyncableEntityService {
         item.unit,
         item.sku ?? null,
         item.godownLocation ?? null,
+        item.hsnCode ?? null,
+        item.gstPercent ?? null,
         pendingSync ? 1 : 0,
       ],
     );
@@ -175,6 +178,8 @@ export class ItemService implements SyncableEntityService {
       unit: row.unit,
       sku: row.sku ?? undefined,
       godownLocation: row.godown_location ?? undefined,
+      hsnCode: row.hsn_code ?? null,
+      gstPercent: row.gst_percent ?? null,
       pendingSync: !!row.pending_sync,
     };
   }

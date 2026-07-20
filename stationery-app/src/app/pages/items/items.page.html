@@ -5,7 +5,13 @@
     </ion-buttons>
     <ion-title>Items</ion-title>
     <ion-buttons slot="end">
-      <ion-button (click)="goToNew()">
+      <ion-button (click)="downloadTemplate()" title="Download Excel template" aria-label="Download Excel template">
+        <ion-icon slot="icon-only" name="download-outline"></ion-icon>
+      </ion-button>
+      <ion-button (click)="openImport()" title="Import items from Excel" aria-label="Import items from Excel">
+        <ion-icon slot="icon-only" name="cloud-upload-outline"></ion-icon>
+      </ion-button>
+      <ion-button (click)="goToNew()" title="Add item" aria-label="Add item">
         <ion-icon slot="icon-only" name="add-outline"></ion-icon>
       </ion-button>
     </ion-buttons>
@@ -29,6 +35,9 @@
     </ion-toolbar>
   }
 </ion-header>
+
+<!-- Hidden picker for "Import items from Excel"; opened by the toolbar button. -->
+<input #fileInput type="file" accept=".xlsx,.xls" (change)="onExcelSelected($event)" hidden />
 
 <ion-content>
   @if (loading) {
