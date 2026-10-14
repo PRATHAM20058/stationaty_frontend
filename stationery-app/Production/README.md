@@ -45,7 +45,8 @@ stationery-app/Production/
 ├── 02_BACKEND_API_AND_DATABASE.md      # Express server, MySQL schema, REST endpoints & archival logic
 ├── 03_GST_ENGINE_AND_INVOICING.md      # Indian GST calculations, HSN splits, round-off & PDF rendering
 ├── 04_FRONTEND_MODULES_AND_UI.md       # Angular services, reactive forms, POS workflow & barcode scanning
-└── 05_DEPLOYMENT_AND_OPERATIONS.md     # Build pipelines, Android packaging, Linux services & CGNAT tunnels
+├── 05_DEPLOYMENT_AND_OPERATIONS.md     # Build pipelines, Android packaging, Linux services & CGNAT tunnels
+└── 06_MACBOOK_AND_ANDROID_STUDIO_GUIDE.md # Local MacBook setup, Homebrew MySQL & Android Studio (Pixel 6 API 33)
 ```
 
 ### Detailed Document Outlines:
@@ -89,6 +90,13 @@ stationery-app/Production/
    - Networking strategies: LAN HTTP (Option A) vs DuckDNS/Caddy HTTPS (Option B).
    - Operating behind ISP Carrier-Grade NAT (CGNAT) via Tailscale Funnel and Cloudflare Tunnels.
    - Operational runbooks, database backup commands, and troubleshooting guides.
+
+6. [**06_MACBOOK_AND_ANDROID_STUDIO_GUIDE.md**](./06_MACBOOK_AND_ANDROID_STUDIO_GUIDE.md)
+   - Step-by-step setup on macOS: Homebrew MySQL 8, Node 20+, and Temurin JDK 21.
+   - Backend bootstrapping: `./setup-db.sh`, `npm run seed`, and `npm run dev`.
+   - **Pixel 6 API 33 Emulator Networking**: Using the `http://10.0.2.2:3000/api` gateway to reach host MacBook.
+   - Launching via Android Studio GUI (`npx cap open android`) or Command Line CLI (`emulator -avd Pixel_6`).
+   - Offline mode verification, camera barcode scanner simulation, and troubleshooting runbook.
 
 ---
 
